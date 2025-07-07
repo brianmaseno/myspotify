@@ -2,6 +2,7 @@
 
 import LayoutWrapper from "@/components/LayoutWrapper";
 import VideoPlayer from "@/components/VideoPlayer";
+import { useAudioPlayer } from "@/hooks/useAudioPlayer";
 import { motion, AnimatePresence } from "framer-motion";
 import { TrendingUp, Play, Heart, Share, MoreHorizontal, Flame, Eye } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -37,6 +38,9 @@ export default function TrendingPage() {
   const [trendingVideos, setTrendingVideos] = useState<TrendingVideo[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedVideo, setSelectedVideo] = useState<any>(null);
+
+  // Use global audio player
+  const { playTrack } = useAudioPlayer();
 
   useEffect(() => {
     const fetchTrendingData = async () => {
@@ -75,6 +79,21 @@ export default function TrendingPage() {
       artist: video.artist,
       source: 'youtube' as const
     });
+  };
+
+  const handleTrackPlay = (track: TrendingTrack) => {
+    const audioTrack = {
+      id: track.id,
+      title: track.title,
+      artist: track.artist,
+      thumbnail: track.cover,
+      duration: track.duration,
+      source: 'spotify' as const,
+      preview_url: track.preview_url,
+      album: track.album
+    };
+    
+    playTrack(audioTrack);
   };
 
   if (loading) {
@@ -226,12 +245,7 @@ export default function TrendingPage() {
                   <motion.button
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}
-                    onClick={() => {
-                      if (track.preview_url) {
-                        const audio = new Audio(track.preview_url);
-                        audio.play();
-                      }
-                    }}
+                    onClick={() => handleTrackPlay(track)}
                     className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/20 transition-all"
                   >
                     <Play className="w-4 h-4 ml-0.5" />

@@ -1,113 +1,276 @@
 import { NextResponse } from 'next/server';
 
-const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY || 'AIzaSyBPo_E4UQVbENLyZXVSlJLjyCEBByTWL_o';
-const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID || 'c3d58ea6bfbf47e8a0705e8213cacd25';
-const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET || 'your_spotify_client_secret';
+const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
 
-async function getSpotifyToken() {
-  try {
-    const response = await fetch('https://accounts.spotify.com/api/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': `Basic ${Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString('base64')}`
+// Fallback trending tracks when YouTube API fails
+function getFallbackTracks() {
+  const fallbackTracks = [
+    {
+      id: 'nQWFzMvCfLE',
+      name: 'What A Beautiful Name',
+      artists: [{ name: 'Hillsong Worship', id: 'hillsong-worship' }],
+      album: {
+        name: 'Let There Be Light',
+        images: [{ url: 'https://i.ytimg.com/vi/nQWFzMvCfLE/hqdefault.jpg' }]
       },
-      body: 'grant_type=client_credentials'
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to get Spotify token');
+      preview_url: null,
+      audioUrl: 'https://www.youtube.com/watch?v=nQWFzMvCfLE',
+      videoUrl: 'https://www.youtube.com/watch?v=nQWFzMvCfLE',
+      duration_ms: 265000,
+      duration: '4:25',
+      popularity: 95,
+      external_urls: { youtube: 'https://www.youtube.com/watch?v=nQWFzMvCfLE' },
+      source: 'youtube',
+      youtubeId: 'nQWFzMvCfLE',
+      thumbnail: 'https://i.ytimg.com/vi/nQWFzMvCfLE/hqdefault.jpg',
+      plays: '150M',
+      change: '+12%',
+      rank: 1
+    },
+    {
+      id: 'Lq4PXLxTuVU',
+      name: 'Come Jesus Come',
+      artists: [{ name: 'CeCe Winans', id: 'cece-winans' }],
+      album: {
+        name: 'Believe For It',
+        images: [{ url: 'https://i.ytimg.com/vi/Lq4PXLxTuVU/hqdefault.jpg' }]
+      },
+      preview_url: null,
+      audioUrl: 'https://www.youtube.com/watch?v=Lq4PXLxTuVU',
+      videoUrl: 'https://www.youtube.com/watch?v=Lq4PXLxTuVU',
+      duration_ms: 312000,
+      duration: '5:12',
+      popularity: 88,
+      external_urls: { youtube: 'https://www.youtube.com/watch?v=Lq4PXLxTuVU' },
+      source: 'youtube',
+      youtubeId: 'Lq4PXLxTuVU',
+      thumbnail: 'https://i.ytimg.com/vi/Lq4PXLxTuVU/hqdefault.jpg',
+      plays: '45M',
+      change: '+8%',
+      rank: 2
+    },
+    {
+      id: 'dNKe1fP9O9o',
+      name: 'Goodness of God',
+      artists: [{ name: 'Bethel Music', id: 'bethel-music' }],
+      album: {
+        name: 'Peace',
+        images: [{ url: 'https://i.ytimg.com/vi/dNKe1fP9O9o/hqdefault.jpg' }]
+      },
+      preview_url: null,
+      audioUrl: 'https://www.youtube.com/watch?v=dNKe1fP9O9o',
+      videoUrl: 'https://www.youtube.com/watch?v=dNKe1fP9O9o',
+      duration_ms: 298000,
+      duration: '4:58',
+      popularity: 92,
+      external_urls: { youtube: 'https://www.youtube.com/watch?v=dNKe1fP9O9o' },
+      source: 'youtube',
+      youtubeId: 'dNKe1fP9O9o',
+      thumbnail: 'https://i.ytimg.com/vi/dNKe1fP9O9o/hqdefault.jpg',
+      plays: '82M',
+      change: '+15%',
+      rank: 3
+    },
+    {
+      id: 'XK2H-WH5s2g',
+      name: 'Way Maker',
+      artists: [{ name: 'Sinach', id: 'sinach' }],
+      album: {
+        name: 'Way Maker',
+        images: [{ url: 'https://i.ytimg.com/vi/XK2H-WH5s2g/hqdefault.jpg' }]
+      },
+      preview_url: null,
+      audioUrl: 'https://www.youtube.com/watch?v=XK2H-WH5s2g',
+      videoUrl: 'https://www.youtube.com/watch?v=XK2H-WH5s2g',
+      duration_ms: 276000,
+      duration: '4:36',
+      popularity: 90,
+      external_urls: { youtube: 'https://www.youtube.com/watch?v=XK2H-WH5s2g' },
+      source: 'youtube',
+      youtubeId: 'XK2H-WH5s2g',
+      thumbnail: 'https://i.ytimg.com/vi/XK2H-WH5s2g/hqdefault.jpg',
+      plays: '120M',
+      change: '+5%',
+      rank: 4
+    },
+    {
+      id: 'rv2Dsb6lmB4',
+      name: 'Reckless Love',
+      artists: [{ name: 'Cory Asbury', id: 'cory-asbury' }],
+      album: {
+        name: 'Reckless Love',
+        images: [{ url: 'https://i.ytimg.com/vi/rv2Dsb6lmB4/hqdefault.jpg' }]
+      },
+      preview_url: null,
+      audioUrl: 'https://www.youtube.com/watch?v=rv2Dsb6lmB4',
+      videoUrl: 'https://www.youtube.com/watch?v=rv2Dsb6lmB4',
+      duration_ms: 254000,
+      duration: '4:14',
+      popularity: 87,
+      external_urls: { youtube: 'https://www.youtube.com/watch?v=rv2Dsb6lmB4' },
+      source: 'youtube',
+      youtubeId: 'rv2Dsb6lmB4',
+      thumbnail: 'https://i.ytimg.com/vi/rv2Dsb6lmB4/hqdefault.jpg',
+      plays: '95M',
+      change: '+10%',
+      rank: 5
     }
+  ];
 
-    const data = await response.json();
-    return data.access_token;
-  } catch (error) {
-    console.error('Error getting Spotify token:', error);
-    return null;
-  }
+  console.log('Using fallback trending tracks:', fallbackTracks.length);
+  
+  return NextResponse.json({ 
+    success: true,
+    tracks: { items: fallbackTracks }
+  });
 }
 
 export async function GET() {
   try {
-    const token = await getSpotifyToken();
-    
-    if (!token) {
-      return NextResponse.json(
-        { error: 'Failed to authenticate with Spotify' },
-        { status: 500 }
-      );
+    console.log('Trending tracks API called - Using YouTube');
+
+    if (!YOUTUBE_API_KEY) {
+      console.error('YouTube API key missing');
+      return getFallbackTracks();
     }
 
-    // Get featured playlists to find trending tracks
-    const playlistsResponse = await fetch(
-      'https://api.spotify.com/v1/browse/featured-playlists?limit=5&country=US',
-      {
+    // Search for trending music on YouTube
+    const trendingQueries = [
+      'trending music 2024',
+      'top hits 2024', 
+      'viral songs 2024',
+      'popular music now',
+      'chart toppers 2024'
+    ];
+
+    const randomQuery = trendingQueries[Math.floor(Math.random() * trendingQueries.length)];
+    
+    const response = await fetch(
+      `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&q=${encodeURIComponent(randomQuery)}&videoCategoryId=10&maxResults=20&order=viewCount&key=${YOUTUBE_API_KEY}`,
+      { 
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Referer': process.env.NEXTAUTH_URL || 'http://localhost:3000'
         }
       }
     );
 
-    if (!playlistsResponse.ok) {
-      throw new Error('Failed to fetch playlists from Spotify');
-    }
-
-    const playlistsData = await playlistsResponse.json();
-    
-    // Get tracks from the first featured playlist
-    if (playlistsData.playlists?.items?.length > 0) {
-      const playlistId = playlistsData.playlists.items[0].id;
-      
-      const tracksResponse = await fetch(
-        `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=10&market=US`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        }
-      );
-
-      if (!tracksResponse.ok) {
-        throw new Error('Failed to fetch tracks from Spotify');
+    if (!response.ok) {
+      console.error(`YouTube API error: ${response.status} - ${response.statusText}`);
+      if (response.status === 403) {
+        console.error('YouTube API quota exceeded or access forbidden. Using fallback data.');
       }
-
-      const tracksData = await tracksResponse.json();
-      
-      const trendingTracks = tracksData.items
-        .filter((item: any) => item.track && item.track.preview_url)
-        .slice(0, 10)
-        .map((item: any, index: number) => {
-          const track = item.track;
-          const duration = Math.floor(track.duration_ms / 1000);
-          const minutes = Math.floor(duration / 60);
-          const seconds = duration % 60;
-          
-          return {
-            id: track.id,
-            title: track.name,
-            artist: track.artists.map((artist: any) => artist.name).join(', '),
-            album: track.album.name,
-            plays: `${Math.floor(Math.random() * 100 + 20)}M`, // Simulated play count
-            change: `+${Math.floor(Math.random() * 30 + 5)}%`, // Simulated change
-            duration: `${minutes}:${seconds.toString().padStart(2, '0')}`,
-            cover: track.album.images[0]?.url || '',
-            rank: index + 1,
-            preview_url: track.preview_url,
-            spotify_url: track.external_urls.spotify,
-            popularity: track.popularity
-          };
-        });
-
-      return NextResponse.json({ tracks: trendingTracks });
+      return getFallbackTracks();
     }
 
-    return NextResponse.json({ tracks: [] });
+    const data = await response.json();
+
+    if (!data.items || data.items.length === 0) {
+      console.warn('No YouTube results found, using fallback');
+      return getFallbackTracks();
+    }
+
+    // Get video details including duration and statistics
+    const videoIds = data.items.map((item: any) => item.id.videoId).join(',');
+    const detailsResponse = await fetch(
+      `https://www.googleapis.com/youtube/v3/videos?part=contentDetails,statistics&id=${videoIds}&key=${YOUTUBE_API_KEY}`
+    );
+
+    const detailsData = await detailsResponse.json();
+    const videoDetails = detailsData.items.reduce((acc: any, item: any) => {
+      acc[item.id] = item;
+      return acc;
+    }, {});
+
+    const trendingTracks = data.items
+      .filter((item: any) => {
+        const details = videoDetails[item.id.videoId];
+        // Filter for music videos (typically 2-8 minutes)
+        const duration = details?.contentDetails?.duration;
+        if (!duration) return false;
+        
+        // Parse duration (PT4M33S format)
+        const match = duration.match(/PT(?:(\d+)M)?(?:(\d+)S)?/);
+        if (!match) return false;
+        
+        const minutes = parseInt(match[1] || '0');
+        const seconds = parseInt(match[2] || '0');
+        const totalSeconds = minutes * 60 + seconds;
+        
+        return totalSeconds >= 120 && totalSeconds <= 480; // 2-8 minutes
+      })
+      .slice(0, 10)
+      .map((item: any, index: number) => {
+        const details = videoDetails[item.id.videoId];
+        const duration = details?.contentDetails?.duration;
+        const viewCount = details?.statistics?.viewCount;
+        
+        // Parse duration for display
+        const match = duration?.match(/PT(?:(\d+)M)?(?:(\d+)S)?/);
+        const minutes = parseInt(match?.[1] || '0');
+        const seconds = parseInt(match?.[2] || '0');
+        const durationString = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+        // Extract artist and title from video title
+        const title = item.snippet.title;
+        let artist = item.snippet.channelTitle;
+        let songTitle = title;
+
+        // Try to parse "Artist - Song" format
+        if (title.includes(' - ')) {
+          const parts = title.split(' - ');
+          artist = parts[0].trim();
+          songTitle = parts.slice(1).join(' - ').trim();
+        }
+
+        // Format view count
+        const views = viewCount ? parseInt(viewCount) : 0;
+        let formattedViews = '0';
+        if (views >= 1000000000) {
+          formattedViews = `${(views / 1000000000).toFixed(1)}B`;
+        } else if (views >= 1000000) {
+          formattedViews = `${(views / 1000000).toFixed(1)}M`;
+        } else if (views >= 1000) {
+          formattedViews = `${(views / 1000).toFixed(1)}K`;
+        } else {
+          formattedViews = views.toString();
+        }
+
+        return {
+          id: item.id.videoId,
+          name: songTitle,
+          artists: [{ name: artist, id: `artist-${item.id.videoId}` }],
+          album: {
+            name: '',
+            images: [{ url: item.snippet.thumbnails.high?.url || item.snippet.thumbnails.default.url }]
+          },
+          preview_url: null, // YouTube doesn't provide direct preview URLs
+          audioUrl: `https://www.youtube.com/watch?v=${item.id.videoId}`,
+          videoUrl: `https://www.youtube.com/watch?v=${item.id.videoId}`,
+          duration_ms: (parseInt(match?.[1] || '0') * 60 + parseInt(match?.[2] || '0')) * 1000,
+          duration: durationString,
+          popularity: Math.min(Math.floor(views / 1000000), 100), // Convert views to popularity score
+          external_urls: { youtube: `https://www.youtube.com/watch?v=${item.id.videoId}` },
+          source: 'youtube',
+          youtubeId: item.id.videoId,
+          thumbnail: item.snippet.thumbnails.high?.url || item.snippet.thumbnails.default.url,
+          plays: formattedViews,
+          change: `+${Math.floor(Math.random() * 30 + 5)}%`,
+          rank: index + 1
+        };
+      });
+
+    console.log('YouTube trending tracks fetched:', trendingTracks.length);
+    
+    return NextResponse.json({ 
+      success: true,
+      tracks: { items: trendingTracks }
+    });
 
   } catch (error) {
-    console.error('Error fetching trending tracks:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch trending tracks' },
-      { status: 500 }
-    );
+    console.error('Error fetching YouTube trending tracks:', error);
+    
+    // Return fallback tracks instead of throwing error
+    console.log('Using fallback tracks due to error');
+    return getFallbackTracks();
   }
 }

@@ -4,6 +4,14 @@ import { motion } from "framer-motion";
 import { Home, Search, Library, TrendingUp, Music, Video, Settings, User } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState, useEffect } from "react";
+
+interface RecentArtist {
+  id: string;
+  name: string;
+  image?: string;
+  type: string;
+}
 
 const navigationItems = [
   { icon: Home, label: "Home", href: "/", active: true },
@@ -21,6 +29,61 @@ const bottomNavItems = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const [recentArtists, setRecentArtists] = useState<RecentArtist[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    fetchRecentArtists();
+  }, []);
+
+  const fetchRecentArtists = async () => {
+    try {
+      // Try to fetch recent artists data
+      const response = await fetch('/api/trending/tracks');
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Sidebar API response:', data);
+        
+        if (data.success && data.tracks?.items) {
+          // Extract unique artists from trending tracks
+          const artists = data.tracks.items.slice(0, 3).map((track: any) => ({
+            id: track.artists[0]?.id || Math.random().toString(),
+            name: track.artists[0]?.name || 'Unknown Artist',
+            image: track.album?.images?.[0]?.url || track.thumbnail,
+            type: 'Artist'
+          }));
+          setRecentArtists(artists);
+        } else {
+          console.warn('Invalid API response structure:', data);
+          // Use fallback artists when API doesn't return expected data
+          setRecentArtists([
+            { id: '1', name: 'Trending Artist 1', type: 'Artist' },
+            { id: '2', name: 'Trending Artist 2', type: 'Artist' },
+            { id: '3', name: 'Trending Artist 3', type: 'Artist' }
+          ]);
+        }
+      } else {
+        console.warn('API request failed:', response.status, response.statusText);
+        // Use fallback when API fails
+        setRecentArtists([
+          { id: '1', name: 'Popular Artist', type: 'Artist' },
+          { id: '2', name: 'Top Charts', type: 'Playlist' },
+          { id: '3', name: 'New Releases', type: 'Album' }
+        ]);
+      }
+    } catch (error) {
+      console.warn('Error fetching recent artists (using fallback):', error);
+      // Always provide fallback data instead of leaving empty
+      setRecentArtists([
+        { id: '1', name: 'Discover Weekly', type: 'Playlist' },
+        { id: '2', name: 'Release Radar', type: 'Playlist' },
+        { id: '3', name: 'Daily Mix', type: 'Playlist' }
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <motion.div
@@ -78,19 +141,48 @@ export default function Sidebar() {
       >
         <h3 className="text-lg font-semibold mb-4">Recently Played</h3>
         <div className="space-y-3">
-          {["The Weeknd", "Ariana Grande", "Billie Eilish"].map((artist, index) => (
-            <motion.div
-              key={artist}
-              whileHover={{ scale: 1.05, x: 10 }}
-              className="flex items-center space-x-3 p-2 rounded-lg cursor-pointer hover:bg-white/5"
-            >
-              <div className="w-10 h-10 bg-gradient-to-br from-purple-400 to-pink-400 rounded-lg"></div>
-              <div>
-                <p className="text-sm font-medium">{artist}</p>
-                <p className="text-xs text-gray-400">Artist</p>
+          {isLoading ? (
+            // Loading skeleton
+            [...Array(3)].map((_, index) => (
+              <div key={index} className="flex items-center space-x-3 p-2 rounded-lg animate-pulse">
+                <div className="w-10 h-10 bg-gray-600 rounded-lg"></div>
+                <div>
+                  <div className="h-3 bg-gray-600 rounded w-20 mb-1"></div>
+                  <div className="h-2 bg-gray-700 rounded w-12"></div>
+                </div>
               </div>
-            </motion.div>
-          ))}
+            ))
+          ) : recentArtists.length > 0 ? (
+            recentArtists.map((artist, index) => (
+              <motion.div
+                key={artist.id}
+                whileHover={{ scale: 1.05, x: 10 }}
+                className="flex items-center space-x-3 p-2 rounded-lg cursor-pointer hover:bg-white/5"
+              >
+                {artist.image ? (
+                  <img 
+                    src={artist.image} 
+                    alt={artist.name}
+                    className="w-10 h-10 rounded-lg object-cover"
+                  />
+                ) : (
+                  <div className="w-10 h-10 bg-gradient-to-br from-purple-400 to-pink-400 rounded-lg flex items-center justify-center">
+                    <Music className="w-5 h-5 text-white" />
+                  </div>
+                )}
+                <div>
+                  <p className="text-sm font-medium truncate max-w-[120px]">{artist.name}</p>
+                  <p className="text-xs text-gray-400">{artist.type}</p>
+                </div>
+              </motion.div>
+            ))
+          ) : (
+            // Fallback when no data
+            <div className="text-center text-gray-400 text-sm py-4">
+              <Music className="w-8 h-8 mx-auto mb-2 opacity-50" />
+              <p>No recent artists</p>
+            </div>
+          )}
         </div>
       </motion.div>
 

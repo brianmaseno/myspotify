@@ -1,15 +1,61 @@
-# 🎵 StellarSound - Beyond Music
+# 🎵 MySpotify - Your Musical Journey
 
-A magnificent music streaming platform that surpasses Spotify in design and functionality. Built with Next.js 14, TypeScript, and the most modern web technologies to create an extraordinary user experience.
+A modern music streaming application with AI-powered features and seamless user experience. Built with Next.js 15, TypeScript, MongoDB, and Azure OpenAI to create a personalized music discovery platform.
 
 ## ✨ Features
 
-### 🎯 **Core Functionality**
-- **Universal Search**: Search across YouTube and Spotify APIs simultaneously
-- **Audio & Video Streaming**: Play both music tracks and music videos
-- **Real-time Player**: Advanced audio/video player with full controls
-- **Responsive Design**: Beautiful interface that works on all devices
-- **Dark Mode**: Elegant dark theme with glassmorphism effects
+### 🤖 **AI-Powered Experience**
+- **AI DJ X**: Personal AI DJ powered by Azure OpenAI
+- **Smart Recommendations**: AI suggests songs based on your listening history
+- **Personalized Greetings**: AI DJ greets you personally and curates playlists
+- **Genre-Aware Playback**: Automatically plays similar genre music when a song ends
+
+### 👤 **User Authentication & Profiles**
+- **Persistent Authentication**: Sign up/Sign in with sessions that don't require re-login
+- **User Profiles**: Personal profiles with listening statistics
+- **Secure Login**: bcrypt password hashing and NextAuth.js sessions
+
+### 🎵 **Music Features**
+- **YouTube Integration**: Full music playback from YouTube (no 30-second previews!)
+- **Genre-Based Discovery**: Browse Christian, Hip Hop, Christian Hip Hop, Pop, Rock, R&B, Country, Electronic
+- **Smart Audio Player**: Supports both audio and video playback with seamless controls
+- **Like/Unlike Songs**: Save favorites with database storage
+- **Recently Played**: Track and display your complete listening history
+- **Queue Management**: Add songs to queue, shuffle, repeat, and smart next track suggestions
+
+### 📊 **Database Integration**
+- **MongoDB Integration**: All user data, play history, and liked songs stored in database
+### 🚀 **Quick Start**
+
+### Prerequisites
+- Node.js 18+ installed
+- MongoDB database (local or Atlas)
+- YouTube API Key
+- Azure OpenAI Account
+
+### Environment Variables
+Create a `.env.local` file with:
+
+```bash
+# YouTube API
+YOUTUBE_API_KEY=your_youtube_api_key_here
+
+# MongoDB
+MONGODB_URI=your_mongodb_connection_string
+
+# NextAuth
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=your_secret_key_here
+
+# Azure OpenAI
+AZURE_OPENAI_ENDPOINT=https://your-endpoint.cognitiveservices.azure.com/
+AZURE_OPENAI_API_KEY=your_azure_openai_key
+AZURE_OPENAI_DEPLOYMENT=gpt-4.1
+AZURE_OPENAI_API_VERSION=2024-04-01-preview
+``` controls are available
+- **Audio-Only Mode**: Extract audio from YouTube videos for music-focused listening
+- **Smart Navigation**: Next/Previous with intelligent suggestions
+- **Volume Control**: Full volume control with mute functionality and visual feedback
 
 ### 🎨 **Stunning UI/UX**
 - **Animated Gradients**: Dynamic background animations

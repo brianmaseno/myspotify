@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import Providers from "./providers";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -13,9 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "StellarSound - Beyond Music",
-  description: "Experience music and videos like never before. A magnificent streaming platform that surpasses all others.",
-  keywords: ["music", "streaming", "videos", "audio", "entertainment", "StellarSound"],
+  title: "MySpotify - Your Musical Journey",
+  description: "Experience music like never before with AI-powered recommendations, personalized playlists, and endless discovery.",
+  keywords: ["music", "streaming", "AI DJ", "playlists", "discovery", "MySpotify"],
   authors: [{ name: "Brian Mayoga" }],
 };
 
@@ -40,7 +41,9 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 min-h-screen`}
       >
-        {children}
+        <Providers>
+          {children}
+        </Providers>
       </body>
     </html>
   );

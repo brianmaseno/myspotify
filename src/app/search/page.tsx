@@ -2,7 +2,7 @@
 
 import LayoutWrapper from "@/components/LayoutWrapper";
 import VideoPlayer from "@/components/VideoPlayer";
-import AudioPlayer from "@/components/AudioPlayer";
+import { useAudioPlayer } from "@/hooks/useAudioPlayer";
 import { motion } from "framer-motion";
 import { Search, Music, Video, Play, Heart, MoreHorizontal, User, Disc, Clock } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -19,6 +19,8 @@ interface SearchResult {
   preview_url?: string;
   external_url?: string;
   popularity?: number;
+  audioUrl?: string;
+  canPlayAsAudio?: boolean;
 }
 
 interface Artist {
@@ -39,9 +41,11 @@ export default function SearchPage() {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<SearchResult | null>(null);
-  const [currentTrack, setCurrentTrack] = useState<SearchResult | null>(null);
   const [selectedArtist, setSelectedArtist] = useState<Artist | null>(null);
   const [showArtistModal, setShowArtistModal] = useState(false);
+
+  // Use global audio player
+  const { playTrack, addToQueue } = useAudioPlayer();
 
   const searchTabs = [
     { id: "all", label: "All", icon: Search },
@@ -131,6 +135,31 @@ export default function SearchPage() {
   const handlePlayVideo = (result: SearchResult) => {
     if (result.type === 'video') {
       setSelectedVideo(result);
+    }
+  };
+
+  const handlePlayAudio = (result: SearchResult) => {
+    // Convert search result to track format for audio player
+    const track = {
+      id: result.id,
+      title: result.title,
+      artist: result.artist,
+      thumbnail: result.thumbnail,
+      duration: result.duration,
+      source: result.source,
+      preview_url: result.preview_url,
+      audioUrl: result.audioUrl,
+      album: result.album
+    };
+    
+    playTrack(track);
+  };
+
+  const handlePlayClick = (result: SearchResult) => {
+    if (result.type === 'video') {
+      handlePlayVideo(result);
+    } else if (result.type === 'audio' || result.canPlayAsAudio) {
+      handlePlayAudio(result);
     }
   };
 
@@ -232,13 +261,7 @@ export default function SearchPage() {
                       <motion.button
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
-                        onClick={() => {
-                          if (result.type === 'video') {
-                            setSelectedVideo(result);
-                          } else {
-                            setCurrentTrack(result);
-                          }
-                        }}
+                        onClick={() => handlePlayClick(result)}
                         className="w-16 h-16 bg-white text-black rounded-full flex items-center justify-center hover:bg-gray-100 transition-colors shadow-lg"
                       >
                         <Play className="w-8 h-8 ml-1" />
@@ -317,14 +340,6 @@ export default function SearchPage() {
         />
       )}
 
-      {/* Audio Player */}
-      {currentTrack && (
-        <AudioPlayer
-          track={currentTrack}
-          onTrackEnd={() => setCurrentTrack(null)}
-        />
-      )}
-
       {/* Artist Modal */}
       {showArtistModal && selectedArtist && (
         <motion.div
@@ -380,7 +395,7 @@ export default function SearchPage() {
                       <span className="text-gray-400 text-sm">{track.duration}</span>
                       {track.preview_url && (
                         <button
-                          onClick={() => setCurrentTrack({
+                          onClick={() => handlePlayAudio({
                             id: track.id,
                             title: track.name,
                             artist: selectedArtist.name,

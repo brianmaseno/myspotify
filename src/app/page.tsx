@@ -2,18 +2,107 @@
 
 import { motion } from "framer-motion";
 import { Play, Pause, SkipForward, SkipBack, Volume2, Heart } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import LayoutWrapper from "../components/LayoutWrapper";
+import { useAudioPlayer } from "@/hooks/useAudioPlayer";
+
+interface SpotifyTrack {
+  id: string;
+  name: string;
+  artists: { name: string }[];
+  album: {
+    name: string;
+    images: { url: string }[];
+  };
+  preview_url: string | null;
+  duration_ms: number;
+  popularity: number;
+}
+
+interface YouTubeVideo {
+  id: { videoId: string };
+  snippet: {
+    title: string;
+    channelTitle: string;
+    thumbnails: {
+      medium: { url: string };
+    };
+  };
+}
 
 export default function HomePage() {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [currentTrack] = useState({
-    title: "Levitating",
-    artist: "Dua Lipa",
-    album: "Future Nostalgia",
-    duration: "3:23",
-    progress: 45,
-  });
+  const { playTrack } = useAudioPlayer();
+  const [trendingTracks, setTrendingTracks] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    fetchTrendingData();
+  }, []);
+
+  const fetchTrendingData = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Fetch trending tracks from the correct API endpoint
+      const spotifyResponse = await fetch('/api/trending/tracks');
+      
+      if (!spotifyResponse.ok) {
+        throw new Error(`HTTP error! status: ${spotifyResponse.status}`);
+      }
+      
+      const spotifyData = await spotifyResponse.json();
+      console.log('API Response:', spotifyData);
+      
+      if (spotifyData.success && spotifyData.tracks?.items) {
+        const formattedTracks = spotifyData.tracks.items.map((track: SpotifyTrack, index: number) => ({
+          id: track.id,
+          title: track.name,
+          artist: track.artists.map(a => a.name).join(', '),
+          album: track.album.name,
+          thumbnail: track.album.images[0]?.url || '',
+          preview_url: track.preview_url,
+          duration: formatDuration(track.duration_ms),
+          source: 'spotify',
+          plays: formatPlays(track.popularity),
+          rank: index + 1
+        }));
+        
+        console.log('Formatted tracks:', formattedTracks);
+        setTrendingTracks(formattedTracks);
+      } else {
+        console.error('API response error:', spotifyData);
+        setTrendingTracks([]);
+      }
+    } catch (error) {
+      console.error('Error fetching trending data:', error);
+      // Fallback to empty array if API fails
+      setTrendingTracks([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const formatDuration = (ms: number) => {
+    const minutes = Math.floor(ms / 60000);
+    const seconds = Math.floor((ms % 60000) / 1000);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
+  const formatPlays = (popularity: number) => {
+    // Convert Spotify popularity (0-100) to play count format
+    const plays = Math.floor((popularity / 100) * 5000000); // Max 5M plays
+    if (plays >= 1000000) {
+      return `${(plays / 1000000).toFixed(1)}M`;
+    } else if (plays >= 1000) {
+      return `${(plays / 1000).toFixed(0)}K`;
+    }
+    return plays.toString();
+  };
+
+  const handleTrackPlay = (track: any) => {
+    console.log('Playing track:', track);
+    playTrack(track);
+  };
 
   return (
     <LayoutWrapper>
@@ -105,123 +194,66 @@ export default function HomePage() {
           className="mb-8"
         >
           <h3 className="text-2xl font-bold mb-6">Trending Now</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {[
-              { title: "Anti-Hero", artist: "Taylor Swift", plays: "2.1M", image: "bg-gradient-to-br from-purple-500 to-pink-500" },
-              { title: "As It Was", artist: "Harry Styles", plays: "1.8M", image: "bg-gradient-to-br from-blue-500 to-cyan-500" },
-              { title: "Heat Waves", artist: "Glass Animals", plays: "1.5M", image: "bg-gradient-to-br from-orange-500 to-red-500" },
-              { title: "Stay", artist: "The Kid LAROI & Justin Bieber", plays: "1.3M", image: "bg-gradient-to-br from-green-500 to-emerald-500" },
-              { title: "Bad Habit", artist: "Steve Lacy", plays: "1.1M", image: "bg-gradient-to-br from-yellow-500 to-orange-500" },
-              { title: "Unholy", artist: "Sam Smith ft. Kim Petras", plays: "980K", image: "bg-gradient-to-br from-indigo-500 to-purple-500" },
-            ].map((track, index) => (
-              <motion.div
-                key={track.title}
-                initial={{ opacity: 0, x: -50 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 1.2 + index * 0.1, duration: 0.6 }}
-                whileHover={{ scale: 1.02, backgroundColor: "rgba(255, 255, 255, 0.1)" }}
-                className="flex items-center space-x-4 p-4 rounded-xl bg-white/5 backdrop-blur-xl border border-white/10 hover:border-white/20 transition-all duration-300 cursor-pointer"
-              >
-                <div className={`w-12 h-12 ${track.image} rounded-lg flex items-center justify-center text-white font-bold text-lg`}>
-                  {index + 1}
+          
+          {isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[...Array(6)].map((_, index) => (
+                <div key={index} className="flex items-center space-x-4 p-4 rounded-xl bg-white/5 backdrop-blur-xl border border-white/10 animate-pulse">
+                  <div className="w-12 h-12 bg-gray-600 rounded-lg"></div>
+                  <div className="flex-1 min-w-0">
+                    <div className="h-4 bg-gray-600 rounded mb-2"></div>
+                    <div className="h-3 bg-gray-700 rounded w-2/3"></div>
+                  </div>
+                  <div className="w-8 h-8 bg-gray-600 rounded-full"></div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <h4 className="font-semibold text-white truncate">{track.title}</h4>
-                  <p className="text-gray-400 text-sm truncate">{track.artist}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-gray-400 text-xs">{track.plays} plays</p>
-                  <motion.button
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center mt-1"
-                  >
-                    <Play className="w-3 h-3 text-white ml-0.5" />
-                  </motion.button>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {trendingTracks.map((track, index) => (
+                <motion.div
+                  key={track.id || index}
+                  initial={{ opacity: 0, x: -50 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 1.2 + index * 0.1, duration: 0.6 }}
+                  whileHover={{ scale: 1.02, backgroundColor: "rgba(255, 255, 255, 0.1)" }}
+                  className="flex items-center space-x-4 p-4 rounded-xl bg-white/5 backdrop-blur-xl border border-white/10 hover:border-white/20 transition-all duration-300 cursor-pointer"
+                  onClick={() => handleTrackPlay(track)}
+                >
+                  <div className="relative">
+                    {track.thumbnail ? (
+                      <img 
+                        src={track.thumbnail} 
+                        alt={track.title}
+                        className="w-12 h-12 rounded-lg object-cover"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center text-white font-bold text-lg">
+                        {track.rank}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-semibold text-white truncate">{track.title}</h4>
+                    <p className="text-gray-400 text-sm truncate">{track.artist}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-gray-400 text-xs">{track.plays} plays</p>
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center mt-1"
+                    >
+                      <Play className="w-3 h-3 text-white ml-0.5" />
+                    </motion.button>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
         </motion.section>
       </div>
-
-      {/* Music Player */}
-      <motion.div
-        initial={{ y: 100, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 1.4, duration: 0.8, ease: "easeOut" }}
-        className="fixed bottom-0 left-0 right-0 bg-black/40 backdrop-blur-xl border-t border-white/20 p-4"
-      >
-        <div className="flex items-center justify-between max-w-screen-xl mx-auto">
-          {/* Track Info */}
-          <div className="flex items-center space-x-4 flex-1">
-            <motion.div
-              animate={{ rotate: isPlaying ? 360 : 0 }}
-              transition={{ duration: 10, repeat: isPlaying ? Infinity : 0, ease: "linear" }}
-              className="w-14 h-14 bg-gradient-to-br from-purple-400 to-pink-400 rounded-xl"
-            ></motion.div>
-            <div>
-              <h4 className="font-semibold">{currentTrack.title}</h4>
-              <p className="text-gray-400 text-sm">{currentTrack.artist}</p>
-            </div>
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.95 }}
-              className="text-gray-400 hover:text-white transition-colors"
-            >
-              <Heart className="w-5 h-5" />
-            </motion.button>
-          </div>
-
-          {/* Player Controls */}
-          <div className="flex flex-col items-center space-y-2 flex-1">
-            <div className="flex items-center space-x-4">
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-                className="text-gray-400 hover:text-white transition-colors"
-              >
-                <SkipBack className="w-5 h-5" />
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setIsPlaying(!isPlaying)}
-                className="w-12 h-12 bg-white text-black rounded-full flex items-center justify-center hover:scale-105 transition-transform"
-              >
-                {isPlaying ? <Pause className="w-6 h-6" /> : <Play className="w-6 h-6 ml-1" />}
-              </motion.button>
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-                className="text-gray-400 hover:text-white transition-colors"
-              >
-                <SkipForward className="w-5 h-5" />
-              </motion.button>
-            </div>
-            <div className="flex items-center space-x-2 w-full max-w-md">
-              <span className="text-xs text-gray-400">1:23</span>
-              <div className="flex-1 h-1 bg-gray-600 rounded-full overflow-hidden">
-                <motion.div
-                  className="h-full bg-gradient-to-r from-purple-400 to-pink-400"
-                  initial={{ width: "0%" }}
-                  animate={{ width: `${currentTrack.progress}%` }}
-                  transition={{ duration: 0.5 }}
-                ></motion.div>
-              </div>
-              <span className="text-xs text-gray-400">{currentTrack.duration}</span>
-            </div>
-          </div>
-
-          {/* Volume */}
-          <div className="flex items-center space-x-2 flex-1 justify-end">
-            <Volume2 className="w-5 h-5 text-gray-400" />
-            <div className="w-24 h-1 bg-gray-600 rounded-full overflow-hidden">
-              <div className="w-3/4 h-full bg-gradient-to-r from-purple-400 to-pink-400"></div>
-            </div>
-          </div>
-        </div>
-      </motion.div>
     </LayoutWrapper>
   );
 }
+
