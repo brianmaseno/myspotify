@@ -125,6 +125,38 @@ function getFallbackTracks() {
   });
 }
 
+// Function to fetch with retries
+async function fetchWithRetry(url: string, options: RequestInit, maxRetries = 3) {
+  let retries = 0;
+  let lastError;
+
+  while (retries < maxRetries) {
+    try {
+      // Add timeout to fetch to avoid hanging
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      return response;
+    } catch (error) {
+      lastError = error;
+      retries++;
+      console.warn(`Fetch attempt ${retries} failed. Retrying...`, error);
+      
+      // Add exponential backoff
+      await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retries)));
+    }
+  }
+  
+  throw lastError || new Error(`Failed after ${maxRetries} retries`);
+}
+
 export async function GET() {
   try {
     console.log('Trending tracks API called - Using YouTube');
@@ -145,14 +177,15 @@ export async function GET() {
 
     const randomQuery = trendingQueries[Math.floor(Math.random() * trendingQueries.length)];
     
-    const response = await fetch(
-      `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&q=${encodeURIComponent(randomQuery)}&videoCategoryId=10&maxResults=20&order=viewCount&key=${YOUTUBE_API_KEY}`,
-      { 
-        headers: {
-          'Referer': process.env.NEXTAUTH_URL || 'http://localhost:3000'
+    try {
+      const response = await fetchWithRetry(
+        `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&q=${encodeURIComponent(randomQuery)}&videoCategoryId=10&maxResults=20&order=viewCount&key=${YOUTUBE_API_KEY}`,
+        { 
+          headers: {
+            'Referer': process.env.NEXTAUTH_URL || 'http://localhost:3000'
+          }
         }
-      }
-    );
+      );
 
     if (!response.ok) {
       console.error(`YouTube API error: ${response.status} - ${response.statusText}`);
@@ -171,11 +204,23 @@ export async function GET() {
 
     // Get video details including duration and statistics
     const videoIds = data.items.map((item: { id: { videoId: string } }) => item.id.videoId).join(',');
-    const detailsResponse = await fetch(
-      `https://www.googleapis.com/youtube/v3/videos?part=contentDetails,statistics&id=${videoIds}&key=${YOUTUBE_API_KEY}`
+      
+    const detailsResponse = await fetchWithRetry(
+      `https://www.googleapis.com/youtube/v3/videos?part=contentDetails,statistics&id=${videoIds}&key=${YOUTUBE_API_KEY}`,
+      {}
     );
+    
+    if (!detailsResponse.ok) {
+      console.error(`YouTube details API error: ${detailsResponse.status}`);
+      return getFallbackTracks();
+    }
 
     const detailsData = await detailsResponse.json();
+    
+    if (!detailsData.items || detailsData.items.length === 0) {
+      console.warn('No YouTube details found, using fallback');
+      return getFallbackTracks();
+    }
     const videoDetails = detailsData.items.reduce((acc: Record<string, { contentDetails?: { duration: string }; statistics?: { viewCount: string } }>, item: { id: string; contentDetails?: { duration: string }; statistics?: { viewCount: string } }) => {
       acc[item.id] = item;
       return acc;
@@ -266,6 +311,10 @@ export async function GET() {
       tracks: { items: trendingTracks }
     });
 
+    } catch (fetchError) {
+      console.error('Error fetching from YouTube API:', fetchError);
+      return getFallbackTracks();
+    }
   } catch (error) {
     console.error('Error fetching YouTube trending tracks:', error);
     
