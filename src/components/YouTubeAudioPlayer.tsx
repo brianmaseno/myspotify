@@ -1,27 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 interface YouTubeAudioPlayerProps {
   videoId: string;
   isPlaying: boolean;
   onReady?: () => void;
   onStateChange?: (state: number) => void;
-  onError?: (error: any) => void;
+  onError?: (error: unknown) => void;
   volume?: number;
   onTimeUpdate?: (currentTime: number, duration: number) => void;
-  onSeekTo?: (time: number) => void;
-}
-
-declare global {
-  interface Window {
-    YT: any;
-    onYouTubeIframeAPIReady: () => void;
-    youtubeAPICallbacks: (() => void)[];
-    youtubePlayerInstance: any;
-    youtubePlayerSeekTo: (time: number) => void;
-    youtubePlayerDirectPlay: () => Promise<void>;
-  }
+  onSeekTo?: () => void;
 }
 
 export default function YouTubeAudioPlayer({
@@ -30,60 +19,61 @@ export default function YouTubeAudioPlayer({
   onReady,
   onStateChange,
   onError,
-  volume = 75, // Default to 75% volume
+  volume = 50,
   onTimeUpdate,
-  onSeekTo
 }: YouTubeAudioPlayerProps) {
-  const playerRef = useRef<any>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
   const [apiReady, setApiReady] = useState(false);
-  const [playerReady, setPlayerReady] = useState(false);
-  const timeUpdateIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const currentVideoIdRef = useRef<string>('');
+  const containerRef = useRef<HTMLDivElement>(null);
+  const playerRef = useRef<YoutubePlayer | null>(null);
   const isInitializingRef = useRef(false);
+  const currentVideoIdRef = useRef<string>('');
+  const timeUpdateIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Stable API ready handler
-  const handleAPIReady = useCallback(() => {
-    console.log('🎵 YouTube API is ready');
-    setApiReady(true);
+  // Initialize YouTube API
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const initializeYouTubeAPI = () => {
+      if (window.YT && window.YT.Player) {
+        console.log('🎵 YouTube API already loaded');
+        setApiReady(true);
+        return;
+      }
+
+      // Check if script already exists
+      if (document.getElementById('youtube-api-script')) {
+        console.log('🎵 YouTube API script already exists, waiting...');
+        return;
+      }
+
+      console.log('🎵 Loading YouTube API...');
+      
+      // Create the script tag
+      const script = document.createElement('script');
+      script.id = 'youtube-api-script';
+      script.src = 'https://www.youtube.com/iframe_api';
+      script.async = true;
+      
+      // Set up the callback
+      (window as { onYouTubeIframeAPIReady?: () => void }).onYouTubeIframeAPIReady = () => {
+        console.log('🎵 ✅ YouTube API loaded successfully');
+        setApiReady(true);
+      };
+      
+      document.body.appendChild(script);
+    };
+
+    initializeYouTubeAPI();
+    
+    return () => {
+      // Cleanup interval on unmount
+      if (timeUpdateIntervalRef.current) {
+        clearInterval(timeUpdateIntervalRef.current);
+      }
+    };
   }, []);
 
-  // Load YouTube API once
-  useEffect(() => {
-    // Check if API is already available
-    if (window.YT && window.YT.Player) {
-      setApiReady(true);
-      return;
-    }
-
-    // Check if script already exists
-    if (document.querySelector('script[src*="youtube.com/iframe_api"]')) {
-      // Script exists, wait for it to load
-      const checkAPI = () => {
-        if (window.YT && window.YT.Player) {
-          setApiReady(true);
-        } else {
-          setTimeout(checkAPI, 100);
-        }
-      };
-      checkAPI();
-      return;
-    }
-
-    console.log('🎵 Loading YouTube API...');
-    
-    // Create script
-    const script = document.createElement('script');
-    script.src = 'https://www.youtube.com/iframe_api';
-    script.async = true;
-    
-    // Set up global callback
-    window.onYouTubeIframeAPIReady = handleAPIReady;
-    
-    document.head.appendChild(script);
-  }, [handleAPIReady]);
-
-  // Create and manage single player instance
+  // Create and manage YouTube player
   useEffect(() => {
     if (!apiReady || !containerRef.current || isInitializingRef.current) {
       return;
@@ -91,34 +81,45 @@ export default function YouTubeAudioPlayer({
 
     // Reuse existing player for same video
     if (playerRef.current && currentVideoIdRef.current === videoId) {
-      console.log('🎵 Reusing existing player for video:', videoId);
+      console.log('🎵 Reusing existing player for same video');
       return;
     }
 
-    console.log('🎵 Initializing player for video:', videoId);
-    isInitializingRef.current = true;
-
-    // Clean up existing player if video changed
-    if (playerRef.current && currentVideoIdRef.current !== videoId) {
-      console.log('🎵 Cleaning up previous player');
+    // Clean up previous player
+    if (playerRef.current && typeof playerRef.current.destroy === 'function') {
+      console.log('🎵 Destroying previous player');
       try {
-        if (timeUpdateIntervalRef.current) {
-          clearInterval(timeUpdateIntervalRef.current);
-          timeUpdateIntervalRef.current = null;
-        }
         playerRef.current.destroy();
-      } catch (e) {
-        console.warn('🎵 Error destroying previous player:', e);
+      } catch (error) {
+        console.warn('🎵 Error destroying player:', error);
       }
       playerRef.current = null;
-      setPlayerReady(false);
+    }
+
+    // Clear any existing interval
+    if (timeUpdateIntervalRef.current) {
+      clearInterval(timeUpdateIntervalRef.current);
+      timeUpdateIntervalRef.current = null;
     }
 
     const createPlayer = () => {
-      try {
-        const playerId = `yt-player-${Date.now()}`;
-        containerRef.current!.innerHTML = `<div id="${playerId}"></div>`;
+      if (!containerRef.current || isInitializingRef.current) return;
+      
+      isInitializingRef.current = true;
+      console.log('🎵 Creating YouTube player for video:', videoId);
 
+      const playerId = `youtube-player-${Date.now()}`;
+      const playerDiv = document.createElement('div');
+      playerDiv.id = playerId;
+      playerDiv.style.position = 'absolute';
+      playerDiv.style.top = '-9999px';
+      playerDiv.style.left = '-9999px';
+      playerDiv.style.width = '1px';
+      playerDiv.style.height = '1px';
+      
+      containerRef.current.appendChild(playerDiv);
+
+      try {
         console.log('🎵 Creating YouTube player...');
         
         playerRef.current = new window.YT.Player(playerId, {
@@ -142,7 +143,7 @@ export default function YouTubeAudioPlayer({
             mute: 0
           },
           events: {
-            onReady: (event: any) => {
+            onReady: (event: { target: YoutubePlayer }) => {
               console.log('🎵 ✅ Player ready');
               
               try {
@@ -168,7 +169,6 @@ export default function YouTubeAudioPlayer({
                 };
                 
                 currentVideoIdRef.current = videoId;
-                setPlayerReady(true);
                 isInitializingRef.current = false;
                 onReady?.();
                 
@@ -179,7 +179,7 @@ export default function YouTubeAudioPlayer({
                     if (duration > 0) {
                       onTimeUpdate?.(0, duration);
                     }
-                  } catch (e) {
+                  } catch {
                     console.warn('🎵 Could not get initial duration');
                   }
                 }, 1000);
@@ -191,9 +191,16 @@ export default function YouTubeAudioPlayer({
               }
             },
             
-            onStateChange: (event: any) => {
-              const states = { '-1': 'unstarted', '0': 'ended', '1': 'playing', '2': 'paused', '3': 'buffering', '5': 'cued' };
-              console.log(`🎵 State: ${states[event.data as keyof typeof states]} (${event.data})`);
+            onStateChange: (event: { data: number; target: YoutubePlayer }) => {
+              const states: Record<string, string> = { 
+                '-1': 'unstarted', 
+                '0': 'ended', 
+                '1': 'playing', 
+                '2': 'paused', 
+                '3': 'buffering', 
+                '5': 'cued' 
+              };
+              console.log(`🎵 State: ${states[event.data.toString()]} (${event.data})`);
               
               // Handle time updates for playing state
               if (event.data === 1) { // playing
@@ -209,7 +216,7 @@ export default function YouTubeAudioPlayer({
                       if (typeof currentTime === 'number' && typeof duration === 'number') {
                         onTimeUpdate(currentTime, duration);
                       }
-                    } catch (e) {
+                    } catch {
                       // Ignore time update errors
                     }
                   }
@@ -225,17 +232,16 @@ export default function YouTubeAudioPlayer({
               onStateChange?.(event.data);
             },
             
-            onError: (event: any) => {
+            onError: (event: { data: number }) => {
               console.error('🎵 ❌ Player error:', event.data);
               isInitializingRef.current = false;
-              setPlayerReady(false);
               onError?.(event.data);
             }
           }
-        });
-        
+        }) as YoutubePlayer;
+
       } catch (error) {
-        console.error('🎵 ❌ Failed to create player:', error);
+        console.error('🎵 Failed to create player:', error);
         isInitializingRef.current = false;
         onError?.(error);
       }
@@ -243,70 +249,71 @@ export default function YouTubeAudioPlayer({
 
     // Small delay to ensure DOM is ready
     setTimeout(createPlayer, 100);
-
-    return () => {
-      if (timeUpdateIntervalRef.current) {
-        clearInterval(timeUpdateIntervalRef.current);
-        timeUpdateIntervalRef.current = null;
-      }
-    };
+    
   }, [apiReady, videoId, volume, onReady, onStateChange, onError, onTimeUpdate]);
-
-  // Handle play/pause
-  useEffect(() => {
-    if (!playerRef.current || !playerReady) {
-      return;
-    }
-
-    try {
-      if (isPlaying) {
-        console.log('🎵 ▶️ Playing');
-        const playPromise = playerRef.current.playVideo();
-        if (playPromise && typeof playPromise.catch === 'function') {
-          playPromise.catch((error: any) => {
-            console.log('🎵 Autoplay prevented - requires user interaction');
-          });
-        }
-      } else {
-        console.log('🎵 ⏸️ Pausing');
-        playerRef.current.pauseVideo();
-      }
-    } catch (error) {
-      console.error('🎵 ❌ Playback control error:', error);
-    }
-  }, [isPlaying, playerReady]);
 
   // Handle volume changes
   useEffect(() => {
-    if (!playerRef.current || !playerReady) {
-      return;
-    }
-
-    try {
-      const targetVolume = Math.max(1, Math.min(100, volume));
-      playerRef.current.setVolume(targetVolume);
-      
-      if (targetVolume > 0) {
-        playerRef.current.unMute();
+    if (playerRef.current && typeof playerRef.current.setVolume === 'function') {
+      try {
+        playerRef.current.setVolume(volume);
+        console.log('🎵 Volume set to:', volume);
+      } catch (error) {
+        console.warn('🎵 Failed to set volume:', error);
       }
-      
-      console.log('🎵 🔊 Volume set to:', targetVolume);
-    } catch (error) {
-      console.warn('🎵 Volume control error:', error);
     }
-  }, [volume, playerReady]);
+  }, [volume]);
+
+  // Handle play state changes
+  useEffect(() => {
+    if (!playerRef.current) return;
+
+    const handlePlayState = async () => {
+      try {
+        if (isPlaying) {
+          console.log('🎵 Attempting to play...');
+          await playerRef.current?.playVideo();
+        } else {
+          console.log('🎵 Pausing...');
+          playerRef.current?.pauseVideo();
+        }
+      } catch (error) {
+        console.log('🎵 Play/pause error (may be expected):', error);
+        onError?.(error);
+      }
+    };
+
+    handlePlayState();
+  }, [isPlaying, onError]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (timeUpdateIntervalRef.current) {
+        clearInterval(timeUpdateIntervalRef.current);
+      }
+      if (playerRef.current && typeof playerRef.current.destroy === 'function') {
+        try {
+          playerRef.current.destroy();
+        } catch (error) {
+          console.warn('🎵 Error during cleanup:', error);
+        }
+      }
+    };
+  }, []);
 
   return (
-    <div style={{ 
-      position: 'fixed', 
-      top: '-1000px', 
-      left: '-1000px',
-      width: '1px',
-      height: '1px',
-      opacity: 0,
-      pointerEvents: 'none'
-    }}>
-      <div ref={containerRef} />
-    </div>
+    <div 
+      ref={containerRef}
+      style={{
+        position: 'absolute',
+        top: '-9999px',
+        left: '-9999px',
+        width: '1px',
+        height: '1px',
+        visibility: 'hidden'
+      }}
+      aria-hidden="true"
+    />
   );
 }

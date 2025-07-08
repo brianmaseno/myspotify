@@ -77,7 +77,23 @@ Create a warm, enthusiastic greeting (2-3 sentences) and suggest 5 songs similar
   }
 }
 
-function analyzeTopArtists(playHistory: any[], likedSongs: any[]): string[] {
+interface Track {
+  artist: string;
+  title: string;
+  genre?: string;
+}
+
+interface PlayHistoryEntry {
+  track: Track;
+  playedAt: Date;
+}
+
+interface LikedSongEntry {
+  track: Track;
+  likedAt: Date;
+}
+
+function analyzeTopArtists(playHistory: PlayHistoryEntry[], likedSongs: LikedSongEntry[]): string[] {
   const artistCounts: { [key: string]: number } = {};
   
   // Count from play history
@@ -97,7 +113,7 @@ function analyzeTopArtists(playHistory: any[], likedSongs: any[]): string[] {
     .map(([artist]) => artist);
 }
 
-function analyzeTopGenres(playHistory: any[], likedSongs: any[]): string[] {
+function analyzeTopGenres(playHistory: PlayHistoryEntry[], likedSongs: LikedSongEntry[]): string[] {
   const genreCounts: { [key: string]: number } = {};
   
   // Count from play history

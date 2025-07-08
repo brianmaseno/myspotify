@@ -25,7 +25,7 @@ export async function GET() {
     const data = await response.json();
 
     // Get video details for additional info like view count and duration
-    const videoIds = data.items.map((item: any) => item.id.videoId).join(',');
+    const videoIds = data.items.map((item: { id: { videoId: string } }) => item.id.videoId).join(',');
     
     const detailsResponse = await fetch(
       `https://www.googleapis.com/youtube/v3/videos?` +
@@ -41,8 +41,8 @@ export async function GET() {
     const detailsData = await detailsResponse.json();
 
     // Combine search results with detailed statistics
-    const trendingVideos = data.items.map((item: any, index: number) => {
-      const details = detailsData.items.find((detail: any) => detail.id === item.id.videoId);
+    const trendingVideos = data.items.map((item: { id: { videoId: string }; snippet: { title: string; channelTitle: string; thumbnails: Record<string, { url: string }>; publishedAt: string; description: string } }, index: number) => {
+      const details = detailsData.items.find((detail: { id: string; contentDetails?: { duration: string }; statistics?: { viewCount: string } }) => detail.id === item.id.videoId);
       
       // Parse duration from YouTube format (PT4M13S) to readable format
       const duration = details?.contentDetails?.duration || 'PT3M30S';

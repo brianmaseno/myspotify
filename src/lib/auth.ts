@@ -1,8 +1,9 @@
-import NextAuth, { AuthOptions, SessionStrategy } from 'next-auth';
+import NextAuth, { AuthOptions, SessionStrategy, Session, User } from 'next-auth';
+import { JWT } from 'next-auth/jwt';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import connectDB from '@/lib/mongodb';
-import { User } from '@/lib/models';
+import { User as UserModel } from '@/lib/models';
 
 export const authOptions: AuthOptions = {
   providers: [
@@ -19,7 +20,7 @@ export const authOptions: AuthOptions = {
 
         try {
           await connectDB();
-          const user = await User.findOne({ email: credentials.email });
+          const user = await UserModel.findOne({ email: credentials.email });
 
           if (!user) {
             return null;
@@ -48,14 +49,14 @@ export const authOptions: AuthOptions = {
     strategy: 'jwt' as SessionStrategy,
   },
   callbacks: {
-    async jwt({ token, user }: { token: any; user: any }) {
+    async jwt({ token, user }: { token: JWT; user: User | undefined }) {
       if (user) {
         token.id = user.id;
         token.profileImage = user.profileImage;
       }
       return token;
     },
-    async session({ session, token }: { session: any; token: any }) {
+    async session({ session, token }: { session: Session; token: JWT }) {
       if (token) {
         session.user.id = token.id;
         session.user.profileImage = token.profileImage;

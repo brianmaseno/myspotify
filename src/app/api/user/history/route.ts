@@ -68,8 +68,8 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ historyEntry });
-  } catch (error: any) {
-    if (error?.code === 11000) {
+  } catch (error: unknown) {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 11000) {
       // Duplicate key error - handle gracefully
       console.warn('Duplicate play history entry attempted');
       return NextResponse.json({ message: 'Entry already exists' }, { status: 200 });

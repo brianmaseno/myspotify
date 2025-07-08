@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { Play, Pause, SkipForward, SkipBack, Volume2, VolumeX, Repeat, Shuffle, Heart } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
 import { useSession } from "next-auth/react";
 import YouTubeAudioPlayer from './YouTubeAudioPlayer';
@@ -31,8 +31,6 @@ export default function AudioPlayer() {
   const [isLiked, setIsLiked] = useState(false);
   const [playerReady, setPlayerReady] = useState(false);
   const [playerError, setPlayerError] = useState(false);
-  const [youtubeCurrentTime, setYoutubeCurrentTime] = useState(0);
-  const [youtubeDuration, setYoutubeDuration] = useState(0);
   const [historyLogged, setHistoryLogged] = useState(false);
   const [userHasInteracted, setUserHasInteracted] = useState(false);
   const { data: session } = useSession();
@@ -82,21 +80,19 @@ export default function AudioPlayer() {
         console.warn('Track missing ID, not saving to history:', currentTrack);
       }
     }
-  }, [currentTrack?.id, session, historyLogged]); // Only trigger when track ID changes
+  }, [currentTrack?.id, currentTrack, session, historyLogged]); // Added currentTrack dependency
 
   // Reset player state when track changes
   useEffect(() => {
     if (currentTrack) {
       setCurrentTime(0);
       setDuration(0);
-      setYoutubeCurrentTime(0);
-      setYoutubeDuration(0);
       setPlayerReady(false);
       setPlayerError(false);
       setHistoryLogged(false); // Reset history flag for new track
       // Don't reset userHasInteracted - keep it for the session
     }
-  }, [currentTrack?.id]);
+  }, [currentTrack?.id, currentTrack]);
 
   const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!playerReady || duration === 0) return;
@@ -109,9 +105,9 @@ export default function AudioPlayer() {
     setCurrentTime(newTime);
     
     // Call YouTube player's seekTo function via global function
-    if ((window as any).youtubePlayerSeekTo) {
+    if ((window as unknown as { youtubePlayerSeekTo?: (time: number) => void }).youtubePlayerSeekTo) {
       console.log('🎵 Seeking to:', newTime);
-      (window as any).youtubePlayerSeekTo(newTime);
+      (window as unknown as { youtubePlayerSeekTo: (time: number) => void }).youtubePlayerSeekTo(newTime);
     } else {
       console.warn('🎵 Seek function not available');
     }
@@ -138,10 +134,10 @@ export default function AudioPlayer() {
       setIsPlaying(newPlayingState);
       
       // For first interaction or when playing, try direct play
-      if (newPlayingState && (window as any).youtubePlayerDirectPlay) {
+      if (newPlayingState && (window as unknown as { youtubePlayerDirectPlay?: () => Promise<void> }).youtubePlayerDirectPlay) {
         try {
           console.log('🎵 Attempting direct play via global function');
-          await (window as any).youtubePlayerDirectPlay();
+          await (window as unknown as { youtubePlayerDirectPlay: () => Promise<void> }).youtubePlayerDirectPlay();
         } catch (error) {
           console.log('🎵 Direct play failed (expected for autoplay restrictions):', error);
           // This is expected on first load without user interaction
@@ -231,8 +227,6 @@ export default function AudioPlayer() {
   const handleYouTubeTimeUpdate = (currentTime: number, duration: number) => {
     setCurrentTime(currentTime);
     setDuration(duration);
-    setYoutubeCurrentTime(currentTime);
-    setYoutubeDuration(duration);
   };
 
   const formatTime = (time: number) => {

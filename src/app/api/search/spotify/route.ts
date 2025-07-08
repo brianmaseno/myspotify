@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // Spotify functionality disabled - focusing on YouTube Music experience
-export async function GET(request: NextRequest) {
+export async function GET() {
   return NextResponse.json(
     { 
       error: 'Spotify search is disabled. This app focuses on YouTube Music.',
