@@ -4,7 +4,7 @@ import LayoutWrapper from "@/components/LayoutWrapper";
 import VideoPlayer from "@/components/VideoPlayer";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
 import { motion } from "framer-motion";
-import { Search, Music, Video, Play, Heart, MoreHorizontal, User, Disc, Clock } from "lucide-react";
+import { Search, Music, Video, Play, Heart, MoreHorizontal, Disc, Clock } from "lucide-react";
 import { useState, useEffect } from "react";
 
 interface SearchResult {
@@ -14,25 +14,13 @@ interface SearchResult {
   thumbnail: string;
   duration: string;
   type: 'audio' | 'video';
-  source: 'spotify' | 'youtube';
+  source: 'youtube';
   album?: string;
-  preview_url?: string;
-  external_url?: string;
-  popularity?: number;
   audioUrl?: string;
   canPlayAsAudio?: boolean;
-}
-
-interface Artist {
-  id: string;
-  name: string;
-  image?: string;
-  genres: string[];
-  followers: number;
-  popularity: number;
-  external_url: string;
-  albums: any[];
-  topTracks: any[];
+  youtubeId?: string;
+  views?: string;
+  popularity?: number;
 }
 
 export default function SearchPage() {
@@ -41,17 +29,14 @@ export default function SearchPage() {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedVideo, setSelectedVideo] = useState<SearchResult | null>(null);
-  const [selectedArtist, setSelectedArtist] = useState<Artist | null>(null);
-  const [showArtistModal, setShowArtistModal] = useState(false);
 
   // Use global audio player
   const { playTrack, addToQueue } = useAudioPlayer();
 
   const searchTabs = [
     { id: "all", label: "All", icon: Search },
-    { id: "tracks", label: "Tracks", icon: Music },
+    { id: "tracks", label: "Music", icon: Music },
     { id: "videos", label: "Videos", icon: Video },
-    { id: "artists", label: "Artists", icon: User },
   ];
 
   const handleSearch = async () => {
@@ -59,61 +44,15 @@ export default function SearchPage() {
     
     setLoading(true);
     try {
-      const promises = [];
-      
-      if (activeTab === "all" || activeTab === "tracks") {
-        promises.push(
-          fetch(`/api/search/spotify?q=${encodeURIComponent(searchQuery)}&limit=20`)
-            .then(res => res.json())
-            .then(data => data.results || [])
-        );
-      }
-      
-      if (activeTab === "all" || activeTab === "videos") {
-        promises.push(
-          fetch(`/api/search/youtube?q=${encodeURIComponent(searchQuery + " music")}&maxResults=20`)
-            .then(res => res.json())
-            .then(data => data.results || [])
-        );
-      }
-
-      if (activeTab === "artists") {
-        promises.push(
-          fetch(`/api/search/spotify?q=${encodeURIComponent(searchQuery)}&type=artist&limit=20`)
-            .then(res => res.json())
-            .then(data => data.results || [])
-        );
-      }
-
-      const results = await Promise.all(promises);
-      const combinedResults = results.flat();
-      setSearchResults(combinedResults);
+      // Only search YouTube - focusing on YouTube Music experience
+      const response = await fetch(`/api/search/youtube?q=${encodeURIComponent(searchQuery + " music")}&maxResults=40`);
+      const data = await response.json();
+      setSearchResults(data.results || []);
     } catch (error) {
       console.error('Search error:', error);
       setSearchResults([]);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleArtistClick = async (artistName: string) => {
-    try {
-      // First search for the artist to get their ID
-      const searchResponse = await fetch(`/api/search/spotify?q=${encodeURIComponent(artistName)}&type=artist&limit=1`);
-      const searchData = await searchResponse.json();
-      
-      if (searchData.results && searchData.results.length > 0) {
-        const artistId = searchData.results[0].id;
-        
-        // Get detailed artist information
-        const artistResponse = await fetch(`/api/artist?id=${artistId}`);
-        const artistData = await artistResponse.json();
-        
-        setSelectedArtist(artistData);
-        setShowArtistModal(true);
-      }
-    } catch (error) {
-      console.error('Error fetching artist data:', error);
     }
   };
 
@@ -127,9 +66,9 @@ export default function SearchPage() {
   }, [searchQuery, activeTab]);
 
   const filteredResults = searchResults.filter(result => {
-    if (activeTab === "tracks") return result.type === "audio";
+    if (activeTab === "tracks") return result.canPlayAsAudio || result.type === "audio";
     if (activeTab === "videos") return result.type === "video";
-    return true;
+    return true; // Show all for "all" tab
   });
 
   const handlePlayVideo = (result: SearchResult) => {
@@ -142,12 +81,12 @@ export default function SearchPage() {
     // Convert search result to track format for audio player
     const track = {
       id: result.id,
+      youtubeId: result.id,
       title: result.title,
       artist: result.artist,
       thumbnail: result.thumbnail,
       duration: result.duration,
-      source: result.source,
-      preview_url: result.preview_url,
+      source: result.source || 'youtube',
       audioUrl: result.audioUrl,
       album: result.album
     };
@@ -156,9 +95,10 @@ export default function SearchPage() {
   };
 
   const handlePlayClick = (result: SearchResult) => {
-    if (result.type === 'video') {
+    if (result.type === 'video' && activeTab === 'videos') {
       handlePlayVideo(result);
-    } else if (result.type === 'audio' || result.canPlayAsAudio) {
+    } else {
+      // For YouTube videos, play as audio (YouTube Music style)
       handlePlayAudio(result);
     }
   };
@@ -174,7 +114,7 @@ export default function SearchPage() {
           className="mb-8"
         >
           <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent mb-6">
-            Search Music & Videos
+            YouTube Music Search
           </h1>
           
           {/* Search Input */}
@@ -250,7 +190,7 @@ export default function SearchPage() {
                       {result.duration}
                     </div>
                     <div className="absolute top-2 left-2 bg-black/80 text-white text-xs px-2 py-1 rounded">
-                      {result.source.toUpperCase()}
+                      YOUTUBE
                     </div>
                     
                     <motion.div
@@ -273,10 +213,7 @@ export default function SearchPage() {
                     <h3 className="text-lg font-semibold text-white mb-1 group-hover:text-purple-300 transition-colors line-clamp-2">
                       {result.title}
                     </h3>
-                    <p 
-                      className="text-gray-400 text-sm mb-2 cursor-pointer hover:text-purple-300 transition-colors"
-                      onClick={() => handleArtistClick(result.artist)}
-                    >
+                    <p className="text-gray-400 text-sm mb-2">
                       {result.artist}
                     </p>
                     {result.album && (
@@ -291,9 +228,9 @@ export default function SearchPage() {
                           <Clock className="w-3 h-3 mr-1" />
                           {result.duration}
                         </span>
-                        {result.popularity && (
+                        {result.views && (
                           <span className="text-gray-500 text-xs">
-                            ★ {result.popularity}
+                            👁 {result.views}
                           </span>
                         )}
                       </div>
@@ -338,104 +275,6 @@ export default function SearchPage() {
           video={selectedVideo}
           onClose={() => setSelectedVideo(null)}
         />
-      )}
-
-      {/* Artist Modal */}
-      {showArtistModal && selectedArtist && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={() => setShowArtistModal(false)}
-        >
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            exit={{ scale: 0.9, opacity: 0 }}
-            className="bg-gradient-to-br from-purple-900/90 to-blue-900/90 backdrop-blur-xl rounded-3xl p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-white/20"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start space-x-6 mb-8">
-              {selectedArtist.image && (
-                <img
-                  src={selectedArtist.image}
-                  alt={selectedArtist.name}
-                  className="w-32 h-32 rounded-full object-cover"
-                />
-              )}
-              <div>
-                <h2 className="text-3xl font-bold text-white mb-2">{selectedArtist.name}</h2>
-                <p className="text-gray-300 mb-2">{selectedArtist.followers.toLocaleString()} followers</p>
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {selectedArtist.genres.map((genre, index) => (
-                    <span key={index} className="px-3 py-1 bg-white/20 rounded-full text-sm text-gray-300">
-                      {genre}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Top Tracks */}
-            {selectedArtist.topTracks.length > 0 && (
-              <div className="mb-8">
-                <h3 className="text-xl font-bold text-white mb-4">Popular Tracks</h3>
-                <div className="space-y-3">
-                  {selectedArtist.topTracks.slice(0, 5).map((track, index) => (
-                    <div key={track.id} className="flex items-center space-x-4 p-3 bg-white/5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer">
-                      <span className="text-gray-400 w-4">{index + 1}</span>
-                      {track.album.image && (
-                        <img src={track.album.image} alt={track.album.name} className="w-12 h-12 rounded" />
-                      )}
-                      <div className="flex-1">
-                        <p className="text-white font-medium">{track.name}</p>
-                        <p className="text-gray-400 text-sm">{track.album.name}</p>
-                      </div>
-                      <span className="text-gray-400 text-sm">{track.duration}</span>
-                      {track.preview_url && (
-                        <button
-                          onClick={() => handlePlayAudio({
-                            id: track.id,
-                            title: track.name,
-                            artist: selectedArtist.name,
-                            thumbnail: track.album.image,
-                            duration: track.duration,
-                            type: 'audio',
-                            source: 'spotify',
-                            preview_url: track.preview_url,
-                            album: track.album.name
-                          })}
-                          className="text-purple-400 hover:text-purple-300 transition-colors"
-                        >
-                          <Play className="w-5 h-5" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Albums */}
-            {selectedArtist.albums.length > 0 && (
-              <div>
-                <h3 className="text-xl font-bold text-white mb-4">Albums</h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                  {selectedArtist.albums.slice(0, 8).map((album) => (
-                    <div key={album.id} className="bg-white/5 rounded-lg p-3 hover:bg-white/10 transition-colors cursor-pointer">
-                      {album.image && (
-                        <img src={album.image} alt={album.name} className="w-full aspect-square rounded mb-2" />
-                      )}
-                      <p className="text-white font-medium text-sm mb-1 line-clamp-2">{album.name}</p>
-                      <p className="text-gray-400 text-xs">{album.release_date?.split('-')[0]} • {album.total_tracks} tracks</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </motion.div>
-        </motion.div>
       )}
     </LayoutWrapper>
   );

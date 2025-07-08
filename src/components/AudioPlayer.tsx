@@ -33,6 +33,8 @@ export default function AudioPlayer() {
   const [playerError, setPlayerError] = useState(false);
   const [youtubeCurrentTime, setYoutubeCurrentTime] = useState(0);
   const [youtubeDuration, setYoutubeDuration] = useState(0);
+  const [historyLogged, setHistoryLogged] = useState(false);
+  const [userHasInteracted, setUserHasInteracted] = useState(false);
   const { data: session } = useSession();
 
   // Update liked status when track changes
@@ -44,7 +46,7 @@ export default function AudioPlayer() {
 
   // Save play history when track changes
   useEffect(() => {
-    if (currentTrack && session && currentTrack.id) {
+    if (currentTrack && session && currentTrack.id && !historyLogged) {
       // Only save once when track first starts playing
       const saveHistory = async () => {
         try {
@@ -67,6 +69,7 @@ export default function AudioPlayer() {
               completed: false
             }),
           });
+          setHistoryLogged(true);
         } catch (error) {
           console.error('Error saving play history:', error);
         }
@@ -79,7 +82,7 @@ export default function AudioPlayer() {
         console.warn('Track missing ID, not saving to history:', currentTrack);
       }
     }
-  }, [currentTrack?.id, session]); // Only trigger when track ID changes
+  }, [currentTrack?.id, session, historyLogged]); // Only trigger when track ID changes
 
   // Reset player state when track changes
   useEffect(() => {
@@ -90,14 +93,10 @@ export default function AudioPlayer() {
       setYoutubeDuration(0);
       setPlayerReady(false);
       setPlayerError(false);
+      setHistoryLogged(false); // Reset history flag for new track
+      // Don't reset userHasInteracted - keep it for the session
     }
   }, [currentTrack?.id]);
-
-  // Save play history to database - remove this function since we moved it above
-  // const savePlayHistory = async (track: any) => {
-  //   if (!session || !track?.id) return;
-  //   ...
-  // };
 
   const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!playerReady || duration === 0) return;
@@ -109,15 +108,47 @@ export default function AudioPlayer() {
     // Update local state immediately for responsiveness
     setCurrentTime(newTime);
     
-    // Call YouTube player's seekTo function
+    // Call YouTube player's seekTo function via global function
     if ((window as any).youtubePlayerSeekTo) {
+      console.log('🎵 Seeking to:', newTime);
       (window as any).youtubePlayerSeekTo(newTime);
+    } else {
+      console.warn('🎵 Seek function not available');
     }
   };
 
-  const handlePlayPause = () => {
+  const handlePlayPause = async () => {
+    console.log('🎵 Play/Pause clicked:', { 
+      playerReady, 
+      playerError, 
+      currentIsPlaying: isPlaying,
+      track: currentTrack?.title,
+      userHasInteracted
+    });
+    
+    // Mark that user has interacted (important for autoplay policies)
+    if (!userHasInteracted) {
+      setUserHasInteracted(true);
+      console.log('🎵 First user interaction detected');
+    }
+    
     if (playerReady && !playerError) {
-      setIsPlaying(!isPlaying);
+      const newPlayingState = !isPlaying;
+      console.log('🎵 Setting isPlaying to:', newPlayingState);
+      setIsPlaying(newPlayingState);
+      
+      // For first interaction or when playing, try direct play
+      if (newPlayingState && (window as any).youtubePlayerDirectPlay) {
+        try {
+          console.log('🎵 Attempting direct play via global function');
+          await (window as any).youtubePlayerDirectPlay();
+        } catch (error) {
+          console.log('🎵 Direct play failed (expected for autoplay restrictions):', error);
+          // This is expected on first load without user interaction
+        }
+      }
+    } else {
+      console.warn('🎵 Cannot play - player not ready or has error:', { playerReady, playerError });
     }
   };
 
@@ -335,7 +366,13 @@ export default function AudioPlayer() {
           >
             {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
           </button>
-          <div className="w-24 bg-gray-600 rounded-full h-1 cursor-pointer group">
+          <div className="w-24 bg-gray-600 rounded-full h-1 cursor-pointer group"
+               onClick={(e) => {
+                 const rect = e.currentTarget.getBoundingClientRect();
+                 const percent = (e.clientX - rect.left) / rect.width;
+                 const newVolume = Math.max(0, Math.min(100, percent * 100));
+                 setVolume(newVolume);
+               }}>
             <div
               className="bg-white h-1 rounded-full group-hover:bg-green-500 transition-colors"
               style={{ width: `${isMuted ? 0 : volume}%` }}
@@ -362,9 +399,10 @@ export default function AudioPlayer() {
       {process.env.NODE_ENV === 'development' && (
         <div className="text-xs text-white/40 mt-2">
           Ready: {playerReady.toString()} | Error: {playerError.toString()} | 
+          Playing: {isPlaying.toString()} | UserClicked: {userHasInteracted.toString()} |
           Time: {currentTime.toFixed(1)}/{duration.toFixed(1)} | 
           Progress: {progress.toFixed(1)}% | VideoId: {currentTrack?.youtubeId || currentTrack?.id} |
-          Track: {currentTrack?.title} | YT Time: {youtubeCurrentTime.toFixed(1)}/{youtubeDuration.toFixed(1)}
+          Track: {currentTrack?.title} | History: {historyLogged.toString()}
         </div>
       )}
     </motion.div>
