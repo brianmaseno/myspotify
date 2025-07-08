@@ -25,19 +25,19 @@ export async function GET(request: NextRequest) {
     const data = await response.json();
 
     // Get video details including duration
-    const videoIds = data.items.map((item: any) => item.id.videoId).join(',');
+    const videoIds = data.items.map((item: { id: { videoId: string } }) => item.id.videoId).join(',');
     const detailsResponse = await fetch(
       `https://www.googleapis.com/youtube/v3/videos?part=contentDetails,statistics&id=${videoIds}&key=${YOUTUBE_API_KEY}`
     );
 
     const detailsData = await detailsResponse.json();
-    const videoDetails = detailsData.items.reduce((acc: any, item: any) => {
+    const videoDetails = detailsData.items.reduce((acc: Record<string, { contentDetails?: { duration: string }; statistics?: { viewCount: string } }>, item: { id: string; contentDetails?: { duration: string }; statistics?: { viewCount: string } }) => {
       acc[item.id] = item;
       return acc;
     }, {});
 
     const tracks = data.items
-      .filter((item: any) => {
+      .filter((item: { id: { videoId: string }; snippet: { title: string; channelTitle: string; thumbnails: Record<string, { url: string }> } }) => {
         const details = videoDetails[item.id.videoId];
         // Filter for music videos (typically 2-8 minutes)
         const duration = details?.contentDetails?.duration;
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
         
         return totalSeconds >= 120 && totalSeconds <= 480; // 2-8 minutes
       })
-      .map((item: any) => {
+      .map((item: { id: { videoId: string }; snippet: { title: string; channelTitle: string; thumbnails: Record<string, { url: string }> } }) => {
         const details = videoDetails[item.id.videoId];
         const duration = details?.contentDetails?.duration;
         

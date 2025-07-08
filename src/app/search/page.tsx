@@ -5,7 +5,8 @@ import VideoPlayer from "@/components/VideoPlayer";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
 import { motion } from "framer-motion";
 import { Search, Music, Video, Play, Heart, MoreHorizontal, Disc, Clock } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import Image from "next/image";
 
 interface SearchResult {
   id: string;
@@ -31,7 +32,7 @@ export default function SearchPage() {
   const [selectedVideo, setSelectedVideo] = useState<SearchResult | null>(null);
 
   // Use global audio player
-  const { playTrack, addToQueue } = useAudioPlayer();
+  const { playTrack } = useAudioPlayer();
 
   const searchTabs = [
     { id: "all", label: "All", icon: Search },
@@ -39,7 +40,7 @@ export default function SearchPage() {
     { id: "videos", label: "Videos", icon: Video },
   ];
 
-  const handleSearch = async () => {
+  const handleSearch = useCallback(async () => {
     if (!searchQuery.trim()) return;
     
     setLoading(true);
@@ -54,7 +55,7 @@ export default function SearchPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [searchQuery]);
 
   useEffect(() => {
     if (searchQuery) {
@@ -63,7 +64,7 @@ export default function SearchPage() {
     } else {
       setSearchResults([]);
     }
-  }, [searchQuery, activeTab]);
+  }, [searchQuery, activeTab, handleSearch]);
 
   const filteredResults = searchResults.filter(result => {
     if (activeTab === "tracks") return result.canPlayAsAudio || result.type === "audio";
@@ -177,11 +178,13 @@ export default function SearchPage() {
                   className="group bg-white/5 backdrop-blur-sm rounded-2xl overflow-hidden border border-white/10 hover:bg-white/10 transition-all duration-300 cursor-pointer"
                 >
                   <div className="relative">
-                    <img
+                    <Image
                       src={result.thumbnail}
                       alt={result.title}
+                      width={300}
+                      height={192}
                       className="w-full h-48 object-cover"
-                      onError={(e) => {
+                      onError={(e: React.SyntheticEvent<HTMLImageElement, Event>) => {
                         (e.target as HTMLImageElement).src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjMzMzIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiM5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=';
                       }}
                     />

@@ -1,6 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const client_id = process.env.SPOTIFY_CLIENT_ID;
     const client_secret = process.env.SPOTIFY_CLIENT_SECRET;
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
     
     // Transform the data to match our expected format
     const transformedData = {
-      items: data.items.map((item: any) => ({
+      items: data.items.map((item: { track: unknown }) => ({
         track: item.track
       }))
     };

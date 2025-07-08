@@ -3,8 +3,9 @@
 import LayoutWrapper from "@/components/LayoutWrapper";
 import { motion } from "framer-motion";
 import { Music, Play, Heart, Plus, Filter, Search } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
+import Image from "next/image";
 
 interface Track {
   id: string;
@@ -26,11 +27,7 @@ export default function MusicPage() {
 
   const genres = ["All", "Pop", "Rock", "Hip Hop", "Electronic", "Jazz", "Classical"];
 
-  useEffect(() => {
-    fetchMusicTracks();
-  }, []);
-
-  const fetchMusicTracks = async () => {
+  const fetchMusicTracks = useCallback(async () => {
     try {
       setIsLoading(true);
       
@@ -39,10 +36,17 @@ export default function MusicPage() {
       if (response.ok) {
         const data = await response.json();
         if (data.success && data.tracks?.items) {
-          const formattedTracks = data.tracks.items.map((track: any) => ({
+          const formattedTracks = data.tracks.items.map((track: {
+            id: string;
+            name: string;
+            artists: Array<{ name: string }>;
+            album: { name: string; images: Array<{ url: string }> };
+            duration_ms: number;
+            preview_url?: string;
+          }) => ({
             id: track.id,
             title: track.name,
-            artist: track.artists.map((a: any) => a.name).join(', '),
+            artist: track.artists.map((a: { name: string }) => a.name).join(', '),
             album: track.album.name,
             duration: formatDuration(track.duration_ms),
             thumbnail: track.album.images[0]?.url || '',
@@ -58,7 +62,11 @@ export default function MusicPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchMusicTracks();
+  }, [fetchMusicTracks]);
 
   const formatDuration = (ms: number) => {
     const minutes = Math.floor(ms / 60000);
@@ -203,9 +211,11 @@ export default function MusicPage() {
                   onClick={() => handleTrackPlay(track)}
                 >
                   <div className="relative mr-4">
-                    <img
+                    <Image
                       src={track.thumbnail}
                       alt={track.title}
+                      width={64}
+                      height={64}
                       className="w-16 h-16 rounded-lg object-cover"
                     />
                     <motion.div

@@ -1,10 +1,11 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Play, Pause, SkipForward, SkipBack, Volume2, Heart } from "lucide-react";
-import { useState, useEffect } from "react";
+import { Play } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
 import LayoutWrapper from "../components/LayoutWrapper";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
+import Image from "next/image";
 
 interface SpotifyTrack {
   id: string;
@@ -19,27 +20,23 @@ interface SpotifyTrack {
   popularity: number;
 }
 
-interface YouTubeVideo {
-  id: { videoId: string };
-  snippet: {
-    title: string;
-    channelTitle: string;
-    thumbnails: {
-      medium: { url: string };
-    };
-  };
-}
-
 export default function HomePage() {
   const { playTrack } = useAudioPlayer();
-  const [trendingTracks, setTrendingTracks] = useState<any[]>([]);
+  const [trendingTracks, setTrendingTracks] = useState<{
+    id: string;
+    title: string;
+    artist: string;
+    album?: string;
+    thumbnail: string;
+    preview_url?: string;
+    duration: string;
+    source: 'youtube' | 'spotify';
+    plays: string;
+    rank: number;
+  }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    fetchTrendingData();
-  }, []);
-
-  const fetchTrendingData = async () => {
+  const fetchTrendingData = useCallback(async () => {
     try {
       setIsLoading(true);
       
@@ -60,9 +57,9 @@ export default function HomePage() {
           artist: track.artists.map(a => a.name).join(', '),
           album: track.album.name,
           thumbnail: track.album.images[0]?.url || '',
-          preview_url: track.preview_url,
+          preview_url: track.preview_url || undefined,
           duration: formatDuration(track.duration_ms),
-          source: 'spotify',
+          source: 'spotify' as const,
           plays: formatPlays(track.popularity),
           rank: index + 1
         }));
@@ -80,7 +77,11 @@ export default function HomePage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchTrendingData();
+  }, [fetchTrendingData]);
 
   const formatDuration = (ms: number) => {
     const minutes = Math.floor(ms / 60000);
@@ -99,7 +100,18 @@ export default function HomePage() {
     return plays.toString();
   };
 
-  const handleTrackPlay = (track: any) => {
+  const handleTrackPlay = (track: {
+    id: string;
+    title: string;
+    artist: string;
+    album?: string;
+    thumbnail: string;
+    preview_url?: string;
+    duration: string;
+    source: 'youtube' | 'spotify';
+    plays: string;
+    rank: number;
+  }) => {
     console.log('Playing track:', track);
     playTrack(track);
   };
@@ -222,9 +234,11 @@ export default function HomePage() {
                 >
                   <div className="relative">
                     {track.thumbnail ? (
-                      <img 
+                      <Image 
                         src={track.thumbnail} 
                         alt={track.title}
+                        width={48}
+                        height={48}
                         className="w-12 h-12 rounded-lg object-cover"
                       />
                     ) : (

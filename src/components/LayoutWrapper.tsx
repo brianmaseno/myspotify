@@ -8,6 +8,7 @@ import { Search, Heart, Bot, User, LogOut } from "lucide-react";
 import { useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 
 interface LayoutWrapperProps {
   children: React.ReactNode;
@@ -117,12 +118,13 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={() => setShowUserMenu(!showUserMenu)}
-                    className="w-10 h-10 bg-gradient-to-br from-purple-400 to-pink-400 rounded-full flex items-center justify-center"
                   >
                     {session?.user?.profileImage ? (
-                      <img 
+                      <Image 
                         src={session.user.profileImage} 
                         alt="Profile" 
+                        width={40}
+                        height={40}
                         className="w-full h-full rounded-full object-cover"
                       />
                     ) : (

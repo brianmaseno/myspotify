@@ -15,7 +15,7 @@ export default function AIDJ({ isOpen, onClose }: AIDJProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [djMessage, setDjMessage] = useState('');
   const [recommendations, setRecommendations] = useState<string[]>([]);
-  const [userStats, setUserStats] = useState<any>(null);
+  const [userStats, setUserStats] = useState<{ totalPlayed: number; totalLiked: number } | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const { setAIDJ, setQueue, playTrack } = useAudioPlayer();
   const { data: session } = useSession();
@@ -71,7 +71,17 @@ export default function AIDJ({ isOpen, onClose }: AIDJProps) {
   };
 
   const loadRecommendedTracks = async (searchQueries: string[]) => {
-    const tracks: any[] = [];
+    const tracks: {
+      id: string;
+      title: string;
+      artist: string;
+      thumbnail: string;
+      duration: string;
+      source: 'youtube';
+      audioUrl: string;
+      videoUrl: string;
+      youtubeId: string;
+    }[] = [];
     
     for (const query of searchQueries) {
       try {

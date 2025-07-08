@@ -5,6 +5,7 @@ import { Home, Search, Library, TrendingUp, Music, Video, Settings, User } from 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
+import Image from "next/image";
 
 interface RecentArtist {
   id: string;
@@ -47,7 +48,11 @@ export default function Sidebar() {
         
         if (data.success && data.tracks?.items) {
           // Extract unique artists from trending tracks
-          const artists = data.tracks.items.slice(0, 3).map((track: any) => ({
+          const artists = data.tracks.items.slice(0, 3).map((track: {
+            artists: Array<{ id?: string; name?: string }>;
+            album?: { images?: Array<{ url?: string }> };
+            thumbnail?: string;
+          }) => ({
             id: track.artists[0]?.id || Math.random().toString(),
             name: track.artists[0]?.name || 'Unknown Artist',
             image: track.album?.images?.[0]?.url || track.thumbnail,
@@ -143,8 +148,8 @@ export default function Sidebar() {
         <div className="space-y-3">
           {isLoading ? (
             // Loading skeleton
-            [...Array(3)].map((_, index) => (
-              <div key={index} className="flex items-center space-x-3 p-2 rounded-lg animate-pulse">
+            [...Array(3)].map((_, i) => (
+              <div key={i} className="flex items-center space-x-3 p-2 rounded-lg animate-pulse">
                 <div className="w-10 h-10 bg-gray-600 rounded-lg"></div>
                 <div>
                   <div className="h-3 bg-gray-600 rounded w-20 mb-1"></div>
@@ -153,16 +158,18 @@ export default function Sidebar() {
               </div>
             ))
           ) : recentArtists.length > 0 ? (
-            recentArtists.map((artist, index) => (
+            recentArtists.map((artist) => (
               <motion.div
                 key={artist.id}
                 whileHover={{ scale: 1.05, x: 10 }}
                 className="flex items-center space-x-3 p-2 rounded-lg cursor-pointer hover:bg-white/5"
               >
                 {artist.image ? (
-                  <img 
+                  <Image 
                     src={artist.image} 
                     alt={artist.name}
+                    width={40}
+                    height={40}
                     className="w-10 h-10 rounded-lg object-cover"
                   />
                 ) : (

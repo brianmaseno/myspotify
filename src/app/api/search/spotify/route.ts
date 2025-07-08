@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 
 // Spotify functionality disabled - focusing on YouTube Music experience
 export async function GET() {

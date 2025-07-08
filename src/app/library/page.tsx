@@ -6,6 +6,7 @@ import { Music, Heart, Clock, Plus, Play, MoreHorizontal, Headphones } from "luc
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
+import Image from "next/image";
 
 interface LibraryTrack {
   id: string;
@@ -138,7 +139,14 @@ export default function LibraryPage() {
     setRecentTracks(convertedTracks);
   }, [recentlyPlayed]);
 
-  const handleGenreClick = async (genre: any) => {
+  const handleGenreClick = async (genre: {
+    id: string;
+    name: string;
+    description: string;
+    color: string;
+    icon: string;
+    searchTerms: string;
+  }) => {
     setIsLoading(true);
     setSelectedGenre(genre.id);
     setCurrentGenre(genre.id);
@@ -348,9 +356,11 @@ export default function LibraryPage() {
                   className="flex items-center p-4 hover:bg-white/10 transition-all duration-300 cursor-pointer group"
                   onClick={() => handleTrackPlay(track)}
                 >
-                  <img
+                  <Image
                     src={track.thumbnail}
                     alt={track.title}
+                    width={48}
+                    height={48}
                     className="w-12 h-12 rounded-lg object-cover mr-4"
                   />
                   <div className="flex-1 min-w-0">
@@ -404,9 +414,11 @@ export default function LibraryPage() {
                   <div className="w-8 text-gray-400 text-sm mr-4">
                     {index + 1}
                   </div>
-                  <img
+                  <Image
                     src={track.thumbnail}
                     alt={track.title}
+                    width={48}
+                    height={48}
                     className="w-12 h-12 rounded-lg object-cover mr-4"
                   />
                   <div className="flex-1 min-w-0">

@@ -41,7 +41,7 @@ export async function GET() {
     const detailsData = await detailsResponse.json();
 
     // Combine search results with detailed statistics
-    const trendingVideos = data.items.map((item: { id: { videoId: string }; snippet: { title: string; channelTitle: string; thumbnails: Record<string, { url: string }>; publishedAt: string; description: string } }, index: number) => {
+    const trendingVideos = data.items.map((item: { id: { videoId: string }; snippet: { title: string; channelTitle: string; thumbnails: Record<string, { url: string }>; publishedAt: string; description: string } }) => {
       const details = detailsData.items.find((detail: { id: string; contentDetails?: { duration: string }; statistics?: { viewCount: string } }) => detail.id === item.id.videoId);
       
       // Parse duration from YouTube format (PT4M13S) to readable format

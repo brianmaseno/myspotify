@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
       followers: artistData.followers.total,
       popularity: artistData.popularity,
       external_url: artistData.external_urls.spotify,
-      albums: albumsData.items?.map((album: any) => ({
+      albums: albumsData.items?.map((album: { id: string; name: string; images: { url: string }[]; release_date: string; total_tracks: number; album_type: string; external_urls: { spotify: string } }) => ({
         id: album.id,
         name: album.name,
         image: album.images[0]?.url,
@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
         type: album.album_type,
         external_url: album.external_urls.spotify
       })) || [],
-      topTracks: topTracksData.tracks?.map((track: any) => ({
+      topTracks: topTracksData.tracks?.map((track: { id: string; name: string; duration_ms: number; preview_url: string; popularity: number; external_urls: { spotify: string }; album: { name: string; images: { url: string }[] } }) => ({
         id: track.id,
         name: track.name,
         duration: formatDuration(track.duration_ms),

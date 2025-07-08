@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
 import { useSession } from "next-auth/react";
 import YouTubeAudioPlayer from './YouTubeAudioPlayer';
+import Image from "next/image";
 
 export default function AudioPlayer() {
   const {
@@ -217,7 +218,7 @@ export default function AudioPlayer() {
     }
   };
 
-  const handleYouTubeError = (error: any) => {
+  const handleYouTubeError = (error: unknown) => {
     console.error('YouTube player error:', error);
     setPlayerError(true);
     setPlayerReady(false);
@@ -252,9 +253,11 @@ export default function AudioPlayer() {
         {/* Track Info */}
         <div className="flex items-center space-x-4 flex-1 min-w-0">
           {currentTrack.thumbnail && (
-            <img
+            <Image
               src={currentTrack.thumbnail}
               alt={currentTrack.title}
+              width={48}
+              height={48}
               className="w-12 h-12 rounded-lg object-cover"
             />
           )}
