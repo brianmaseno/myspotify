@@ -19,8 +19,6 @@ const navigationItems = [
   { icon: Search, label: "Search", href: "/search" },
   { icon: Library, label: "Your Library", href: "/library" },
   { icon: TrendingUp, label: "Trending", href: "/trending" },
-  { icon: Music, label: "Music", href: "/music" },
-  { icon: Video, label: "Videos", href: "/videos" },
 ];
 
 const bottomNavItems = [
@@ -95,10 +93,8 @@ export default function Sidebar() {
       initial={{ x: -300, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
       transition={{ duration: 0.8, ease: "easeOut" }}
-      className="w-64 bg-black/30 backdrop-blur-xl border-r border-white/10 p-6 flex flex-col h-full"
-    >
-      {/* Logo */}
-      <motion.div
+      className="w-64 bg-black/30 backdrop-blur-xl border-r border-white/10 p-6 flex flex-col h-full hidden lg:flex"
+    > <motion.div
         initial={{ scale: 0, rotate: -180 }}
         animate={{ scale: 1, rotate: 0 }}
         transition={{ delay: 0.3, duration: 0.8, ease: "easeOut" }}

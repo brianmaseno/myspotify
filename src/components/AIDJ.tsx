@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bot, Play, Volume2, Sparkles, X } from 'lucide-react';
+import { Bot, Play, Volume2, Sparkles, X, VolumeX } from 'lucide-react';
 import { useAudioPlayer } from '@/hooks/useAudioPlayer';
 import { useSession } from 'next-auth/react';
 
@@ -17,12 +17,99 @@ export default function AIDJ({ isOpen, onClose }: AIDJProps) {
   const [recommendations, setRecommendations] = useState<string[]>([]);
   const [userStats, setUserStats] = useState<{ totalPlayed: number; totalLiked: number } | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [speechEnabled, setSpeechEnabled] = useState(true);
+  const [typingText, setTypingText] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
   const { setAIDJ, setQueue, playTrack } = useAudioPlayer();
   const { data: session } = useSession();
 
+  // Cleanup speech synthesis when component unmounts or closes
+  useEffect(() => {
+    return () => {
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen && window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      setIsTyping(false);
+    }
+  }, [isOpen]);
+
+  const speakText = async (text: string) => {
+    if (!speechEnabled || !text) return;
+
+    // Cancel any ongoing speech
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+
+    return new Promise<void>((resolve) => {
+      if (!window.speechSynthesis) {
+        resolve();
+        return;
+      }
+
+      const utterance = new SpeechSynthesisUtterance(text);
+      
+      // Configure voice settings for a more DJ-like experience
+      utterance.rate = 0.9;
+      utterance.pitch = 1.1;
+      utterance.volume = 0.7;
+
+      // Try to find a suitable voice
+      const voices = window.speechSynthesis.getVoices();
+      const preferredVoice = voices.find(voice => 
+        voice.name.includes('Microsoft David') || 
+        voice.name.includes('Google US English') ||
+        voice.lang.startsWith('en')
+      );
+      
+      if (preferredVoice) {
+        utterance.voice = preferredVoice;
+      }
+
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => {
+        setIsSpeaking(false);
+        resolve();
+      };
+      utterance.onerror = () => {
+        setIsSpeaking(false);
+        resolve();
+      };
+
+      window.speechSynthesis.speak(utterance);
+    });
+  };
+
+  const typeText = async (text: string, speed: number = 50) => {
+    setIsTyping(true);
+    setTypingText('');
+    
+    for (let i = 0; i <= text.length; i++) {
+      await new Promise(resolve => setTimeout(resolve, speed));
+      setTypingText(text.slice(0, i));
+    }
+    
+    setIsTyping(false);
+  };
+
   const startAIDJ = async () => {
     if (!session) {
-      setDjMessage("Hey there! Sign in to get personalized recommendations from DJ X!");
+      const message = "Hey there! Sign in to get personalized recommendations from DJ X!";
+      setDjMessage(message);
+      
+      if (speechEnabled) {
+        await speakText(message);
+      } else {
+        await typeText(message);
+      }
       return;
     }
 
@@ -36,37 +123,45 @@ export default function AIDJ({ isOpen, onClose }: AIDJProps) {
 
       if (response.ok) {
         const data = await response.json();
-        setDjMessage(data.djMessage);
         setRecommendations(data.recommendations || []);
         setUserStats(data.userStats);
         setAIDJ(true);
         
-        // Simulate DJ talking with text-to-speech effect
-        await simulateDJVoice(data.djMessage);
+        // Either speak or type the DJ message
+        if (speechEnabled) {
+          setDjMessage(data.djMessage);
+          await speakText(data.djMessage);
+        } else {
+          await typeText(data.djMessage);
+          setDjMessage(data.djMessage);
+        }
         
         // Auto-load recommended tracks
         if (data.recommendations && data.recommendations.length > 0) {
           await loadRecommendedTracks(data.recommendations);
         }
       } else {
-        setDjMessage("Oops! DJ X is having some technical difficulties. Try again in a moment!");
+        const fallbackMessage = "Oops! DJ X is having some technical difficulties. Try again in a moment!";
+        if (speechEnabled) {
+          setDjMessage(fallbackMessage);
+          await speakText(fallbackMessage);
+        } else {
+          await typeText(fallbackMessage);
+          setDjMessage(fallbackMessage);
+        }
       }
     } catch (error) {
       console.error('AI DJ error:', error);
-      setDjMessage("Hey! I'm DJ X, and I'm excited to play some music for you!");
+      const errorMessage = "Hey! I'm DJ X, and I'm excited to play some music for you!";
+      if (speechEnabled) {
+        setDjMessage(errorMessage);
+        await speakText(errorMessage);
+      } else {
+        await typeText(errorMessage);
+        setDjMessage(errorMessage);
+      }
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  const simulateDJVoice = async (message: string) => {
-    // Simulate text-to-speech by revealing text word by word
-    const words = message.split(' ');
-    setDjMessage('');
-    
-    for (let i = 0; i <= words.length; i++) {
-      await new Promise(resolve => setTimeout(resolve, 300));
-      setDjMessage(words.slice(0, i).join(' '));
     }
   };
 
@@ -121,8 +216,24 @@ export default function AIDJ({ isOpen, onClose }: AIDJProps) {
     setIsPlaying(false);
     setAIDJ(false);
     setDjMessage('');
+    setTypingText('');
     setRecommendations([]);
     setUserStats(null);
+    setIsSpeaking(false);
+    setIsTyping(false);
+    
+    // Stop any ongoing speech
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+  };
+
+  const toggleSpeech = () => {
+    setSpeechEnabled(!speechEnabled);
+    if (window.speechSynthesis && window.speechSynthesis.speaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+    }
   };
 
   return (
@@ -140,51 +251,104 @@ export default function AIDJ({ isOpen, onClose }: AIDJProps) {
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.8, opacity: 0 }}
             transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="bg-gradient-to-br from-blue-900/95 via-purple-900/95 to-indigo-900/95 backdrop-blur-xl border border-white/20 rounded-3xl p-8 max-w-md w-full shadow-2xl"
+            className={`bg-gradient-to-br from-blue-900/95 via-purple-900/95 to-indigo-900/95 backdrop-blur-xl border border-white/20 rounded-3xl p-8 max-w-md w-full shadow-2xl relative ${
+              isTyping ? 'overflow-hidden' : ''
+            }`}
             onClick={(e) => e.stopPropagation()}
+            style={{ 
+              maxHeight: '90vh',
+              overflowY: isTyping ? 'hidden' : 'auto'
+            }}
           >
+            {/* Scroll Lock Overlay when typing */}
+            {isTyping && (
+              <div className="absolute inset-0 z-10 bg-transparent" />
+            )}
+            
             <div className="text-center">
               {/* Close Button */}
               <button
                 onClick={onClose}
-                className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors"
+                className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors z-20"
               >
                 <X className="w-6 h-6" />
+              </button>
+
+              {/* Speech Toggle */}
+              <button
+                onClick={toggleSpeech}
+                className="absolute top-4 left-4 text-gray-400 hover:text-white transition-colors z-20"
+                title={speechEnabled ? "Disable voice" : "Enable voice"}
+              >
+                {speechEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
               </button>
 
               {/* DJ Avatar */}
               <motion.div
                 animate={{ 
-                  rotate: isPlaying ? 360 : 0,
-                  scale: isPlaying ? [1, 1.1, 1] : 1,
+                  rotate: (isPlaying || isSpeaking) ? 360 : 0,
+                  scale: (isPlaying || isSpeaking) ? [1, 1.1, 1] : 1,
                 }}
                 transition={{ 
-                  rotate: { duration: 3, repeat: isPlaying ? Infinity : 0, ease: "linear" },
-                  scale: { duration: 2, repeat: isPlaying ? Infinity : 0 }
+                  rotate: { duration: 3, repeat: (isPlaying || isSpeaking) ? Infinity : 0, ease: "linear" },
+                  scale: { duration: 2, repeat: (isPlaying || isSpeaking) ? Infinity : 0 }
                 }}
                 className={`w-24 h-24 mx-auto mb-6 rounded-full flex items-center justify-center relative ${
-                  isPlaying ? 'bg-gradient-to-r from-blue-500 to-purple-500' : 'bg-gradient-to-r from-gray-600 to-gray-700'
+                  (isPlaying || isSpeaking) ? 'bg-gradient-to-r from-blue-500 to-purple-500' : 'bg-gradient-to-r from-gray-600 to-gray-700'
                 }`}
               >
                 <Bot className="w-12 h-12 text-white" />
-                {isPlaying && (
+                {(isPlaying || isSpeaking) && (
                   <div className="absolute inset-0 rounded-full border-4 border-white/30 animate-ping"></div>
                 )}
                 <Sparkles className="absolute -top-2 -right-2 w-6 h-6 text-yellow-400 animate-pulse" />
+                
+                {/* Speaking indicator */}
+                {isSpeaking && (
+                  <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2">
+                    <div className="flex space-x-1">
+                      {[...Array(3)].map((_, i) => (
+                        <motion.div
+                          key={i}
+                          className="w-1 h-1 bg-white rounded-full"
+                          animate={{ scale: [1, 1.5, 1] }}
+                          transition={{ 
+                            duration: 0.6, 
+                            repeat: Infinity, 
+                            delay: i * 0.2 
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
               </motion.div>
 
               {/* DJ Name */}
               <h2 className="text-3xl font-bold text-white mb-2">DJ X</h2>
               <p className="text-blue-300 mb-6">Your AI Music Companion</p>
 
+              {/* Status Indicator */}
+              {(isSpeaking || isTyping) && (
+                <div className="flex items-center justify-center gap-2 mb-4">
+                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                  <span className="text-green-400 text-sm">
+                    {isSpeaking ? 'Speaking...' : 'Typing...'}
+                  </span>
+                </div>
+              )}
+
               {/* DJ Message */}
-              {djMessage && (
+              {(djMessage || typingText) && (
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="bg-white/10 backdrop-blur rounded-2xl p-4 mb-6 border border-white/20"
+                  className="bg-white/10 backdrop-blur rounded-2xl p-4 mb-6 border border-white/20 min-h-[80px] flex items-center"
                 >
-                  <p className="text-white text-sm leading-relaxed">{djMessage}</p>
+                  <p className="text-white text-sm leading-relaxed">
+                    {speechEnabled ? djMessage : (typingText || djMessage)}
+                    {isTyping && <span className="animate-pulse">|</span>}
+                  </p>
                 </motion.div>
               )}
 
@@ -214,7 +378,7 @@ export default function AIDJ({ isOpen, onClose }: AIDJProps) {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={startAIDJ}
-                    disabled={isLoading}
+                    disabled={isLoading || isSpeaking || isTyping}
                     className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 px-6 rounded-2xl font-semibold hover:from-blue-700 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                   >
                     {isLoading ? (
@@ -241,7 +405,7 @@ export default function AIDJ({ isOpen, onClose }: AIDJProps) {
                   </motion.button>
                 )}
 
-                {!session && (
+                {!session && !isLoading && (
                   <p className="text-sm text-gray-400 mt-3">
                     Sign in for personalized recommendations
                   </p>
@@ -257,7 +421,7 @@ export default function AIDJ({ isOpen, onClose }: AIDJProps) {
                   className="mt-6 pt-6 border-t border-white/20"
                 >
                   <h3 className="text-sm font-semibold text-gray-300 mb-2">Playing Next:</h3>
-                  <div className="space-y-1">
+                  <div className="space-y-1 max-h-20 overflow-y-auto">
                     {recommendations.slice(0, 3).map((rec, index) => (
                       <div key={index} className="text-xs text-gray-400 truncate">
                         {index + 1}. {rec}
