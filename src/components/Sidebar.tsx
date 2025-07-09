@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Home, Search, Library, TrendingUp, Music, Video, Settings, User } from "lucide-react";
+import { Home, Search, Library, TrendingUp, Music, Settings, User } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";

@@ -3,7 +3,7 @@
 import LayoutWrapper from "@/components/LayoutWrapper";
 import { useAudioPlayer } from "@/hooks/useAudioPlayer";
 import { motion } from "framer-motion";
-import { Heart, Play, MoreHorizontal, Music, Trash2 } from "lucide-react";
+import { Heart, Play, Music } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import Image from "next/image";

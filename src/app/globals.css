@@ -77,4 +77,10 @@ img {
     -webkit-box-orient: vertical;
     overflow: hidden;
   }
+  
+  /* Ensure user menu stays on top */
+  .user-menu-container {
+    z-index: 9999;
+    position: relative;
+  }
 }
