@@ -140,7 +140,11 @@ export default function YouTubeAudioPlayer({
             cc_load_policy: 0,
             origin: window.location.origin,
             widget_referrer: window.location.href,
-            mute: 0
+            mute: 0,
+            start: 0,
+            end: 0,
+            loop: 0,
+            playlist: videoId // This helps with audio reliability
           },
           events: {
             onReady: (event: { target: YoutubePlayer }) => {
@@ -172,17 +176,27 @@ export default function YouTubeAudioPlayer({
                 isInitializingRef.current = false;
                 onReady?.();
                 
-                // Get initial duration
-                setTimeout(() => {
+                // Get initial duration with retry logic
+                const getDurationWithRetry = (attempts = 0) => {
+                  if (attempts >= 5) return; // Max 5 attempts
+                  
                   try {
                     const duration = event.target.getDuration();
                     if (duration > 0) {
                       onTimeUpdate?.(0, duration);
+                    } else if (attempts < 4) {
+                      // Retry after a longer delay if duration is not ready
+                      setTimeout(() => getDurationWithRetry(attempts + 1), 2000);
                     }
                   } catch {
-                    console.warn('🎵 Could not get initial duration');
+                    console.warn('🎵 Could not get duration, retrying...');
+                    if (attempts < 4) {
+                      setTimeout(() => getDurationWithRetry(attempts + 1), 2000);
+                    }
                   }
-                }, 1000);
+                };
+                
+                setTimeout(() => getDurationWithRetry(), 1000);
                 
               } catch (error) {
                 console.error('🎵 Error in onReady:', error);
@@ -213,7 +227,7 @@ export default function YouTubeAudioPlayer({
                     try {
                       const currentTime = event.target.getCurrentTime();
                       const duration = event.target.getDuration();
-                      if (typeof currentTime === 'number' && typeof duration === 'number') {
+                      if (typeof currentTime === 'number' && typeof duration === 'number' && duration > 0) {
                         onTimeUpdate(currentTime, duration);
                       }
                     } catch {
@@ -226,6 +240,18 @@ export default function YouTubeAudioPlayer({
                 if (timeUpdateIntervalRef.current) {
                   clearInterval(timeUpdateIntervalRef.current);
                   timeUpdateIntervalRef.current = null;
+                }
+              }
+              
+              // Handle ended state - provide final time update
+              if (event.data === 0 && onTimeUpdate) { // ended
+                try {
+                  const duration = event.target.getDuration();
+                  if (typeof duration === 'number' && duration > 0) {
+                    onTimeUpdate(duration, duration);
+                  }
+                } catch {
+                  // Ignore errors
                 }
               }
               
@@ -272,10 +298,22 @@ export default function YouTubeAudioPlayer({
       try {
         if (isPlaying) {
           console.log('🎵 Attempting to play...');
-          await playerRef.current?.playVideo();
+          if (playerRef.current && typeof playerRef.current.playVideo === 'function') {
+            playerRef.current.playVideo();
+          } else {
+            console.warn('🎵 playVideo function not available on player');
+            // Try to force reload player if function is missing
+            setTimeout(() => {
+              if (playerRef.current && typeof playerRef.current.playVideo === 'function') {
+                playerRef.current.playVideo();
+              }
+            }, 1000);
+          }
         } else {
           console.log('🎵 Pausing...');
-          playerRef.current?.pauseVideo();
+          if (playerRef.current && typeof playerRef.current.pauseVideo === 'function') {
+            playerRef.current.pauseVideo();
+          }
         }
       } catch (error) {
         console.log('🎵 Play/pause error (may be expected):', error);
@@ -289,14 +327,35 @@ export default function YouTubeAudioPlayer({
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      console.log('🎵 Cleaning up YouTube player...');
+      
       if (timeUpdateIntervalRef.current) {
         clearInterval(timeUpdateIntervalRef.current);
+        timeUpdateIntervalRef.current = null;
       }
-      if (playerRef.current && typeof playerRef.current.destroy === 'function') {
+      
+      if (playerRef.current) {
         try {
-          playerRef.current.destroy();
+          // Stop playback before destroying
+          if (typeof playerRef.current.pauseVideo === 'function') {
+            playerRef.current.pauseVideo();
+          }
+          
+          // Clean up global references
+          if (window.youtubePlayerInstance === playerRef.current) {
+            window.youtubePlayerInstance = null;
+            window.youtubePlayerSeekTo = undefined;
+            window.youtubePlayerDirectPlay = undefined;
+          }
+          
+          // Destroy the player
+          if (typeof playerRef.current.destroy === 'function') {
+            playerRef.current.destroy();
+          }
         } catch (error) {
           console.warn('🎵 Error during cleanup:', error);
+        } finally {
+          playerRef.current = null;
         }
       }
     };

@@ -5,12 +5,29 @@ import connectDB from '@/lib/mongodb';
 import { PlayHistory, LikedSong } from '@/lib/models';
 import { AzureOpenAI } from 'openai';
 
-const client = new AzureOpenAI({
-  endpoint: process.env.AZURE_OPENAI_ENDPOINT!,
-  apiKey: process.env.AZURE_OPENAI_API_KEY!,
-  deployment: process.env.AZURE_OPENAI_DEPLOYMENT!,
-  apiVersion: process.env.AZURE_OPENAI_API_VERSION!,
-});
+// Check if Azure OpenAI credentials are available
+const hasAzureCredentials = 
+  process.env.AZURE_OPENAI_ENDPOINT && 
+  process.env.AZURE_OPENAI_API_KEY && 
+  process.env.AZURE_OPENAI_DEPLOYMENT && 
+  process.env.AZURE_OPENAI_API_VERSION;
+
+let client: AzureOpenAI | null = null;
+
+if (hasAzureCredentials) {
+  try {
+    client = new AzureOpenAI({
+      endpoint: process.env.AZURE_OPENAI_ENDPOINT!,
+      apiKey: process.env.AZURE_OPENAI_API_KEY!,
+      deployment: process.env.AZURE_OPENAI_DEPLOYMENT!,
+      apiVersion: process.env.AZURE_OPENAI_API_VERSION!,
+    });
+  } catch (error) {
+    console.error('Failed to initialize Azure OpenAI client:', error);
+  }
+} else {
+  console.warn('Azure OpenAI credentials not provided. AI DJ will use fallback responses.');
+}
 
 export async function POST() {
   try {
@@ -19,43 +36,67 @@ export async function POST() {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    await connectDB();
-
-    // Get user's listening history and liked songs
-    const [playHistory, likedSongs] = await Promise.all([
-      PlayHistory.find({ userId: session.user.id })
-        .sort({ playedAt: -1 })
-        .limit(50),
-      LikedSong.find({ userId: session.user.id })
-        .sort({ likedAt: -1 })
-        .limit(20),
-    ]);
+    let playHistory: PlayHistoryEntry[] = [];
+    let likedSongs: LikedSongEntry[] = [];
+    
+    try {
+      await connectDB();
+      // Get user's listening history and liked songs
+      const [playHistoryResult, likedSongsResult] = await Promise.all([
+        PlayHistory.find({ userId: session.user.id })
+          .sort({ playedAt: -1 })
+          .limit(50)
+          .lean()
+          .catch(() => []),
+        LikedSong.find({ userId: session.user.id })
+          .sort({ likedAt: -1 })
+          .limit(20)
+          .lean()
+          .catch(() => []),
+      ]);
+      
+      playHistory = playHistoryResult as PlayHistoryEntry[];
+      likedSongs = likedSongsResult as LikedSongEntry[];
+    } catch (dbError) {
+      console.error('Database error:', dbError);
+      // Continue with empty arrays if database fails
+    }
 
     // Analyze user preferences
     const topArtists = analyzeTopArtists(playHistory, likedSongs);
     const topGenres = analyzeTopGenres(playHistory, likedSongs);
     const recentTracks = playHistory.slice(0, 10).map(h => h.track);
 
-    // Create personalized message
-    const prompt = `You are DJ X, a cool and friendly AI DJ. Based on the user's music taste, create a personalized greeting and music recommendation. 
+    // Default fallback message
+    let djMessage = "Hey there! I'm DJ X, and I've got some amazing tracks lined up for you based on your incredible taste in music!";
+    
+    if (client) {
+      try {
+        // Create personalized message
+        const prompt = `You are DJ X, a cool and friendly AI DJ. Based on the user's music taste, create a personalized greeting and music recommendation. 
 
-User's top artists: ${topArtists.slice(0, 5).join(', ')}
-User's top genres: ${topGenres.slice(0, 3).join(', ')}
-Recent tracks: ${recentTracks.map(t => `${t.artist} - ${t.title}`).slice(0, 3).join(', ')}
+User's top artists: ${topArtists.slice(0, 5).join(', ') || 'Various Artists'}
+User's top genres: ${topGenres.slice(0, 3).join(', ') || 'Mixed Genres'}
+Recent tracks: ${recentTracks.map(t => `${t.artist} - ${t.title}`).slice(0, 3).join(', ') || 'Various tracks'}
 
 Create a warm, enthusiastic greeting (2-3 sentences) and suggest 5 songs similar to their taste. Keep it casual and exciting, like a real DJ introducing a set. End with enthusiasm about the music you're about to play.`;
 
-    const response = await client.chat.completions.create({
-      model: process.env.AZURE_OPENAI_DEPLOYMENT!,
-      messages: [
-        { role: 'system', content: 'You are DJ X, an enthusiastic AI DJ who loves music and knows how to get people excited about great songs.' },
-        { role: 'user', content: prompt }
-      ],
-      max_tokens: 300,
-      temperature: 0.8,
-    });
+        const response = await client.chat.completions.create({
+          model: process.env.AZURE_OPENAI_DEPLOYMENT!,
+          messages: [
+            { role: 'system', content: 'You are DJ X, an enthusiastic AI DJ who loves music and knows how to get people excited about great songs.' },
+            { role: 'user', content: prompt }
+          ],
+          max_tokens: 300,
+          temperature: 0.8,
+        });
 
-    const djMessage = response.choices[0]?.message?.content || "Hey there! I'm DJ X, and I've got some amazing tracks lined up for you based on your incredible taste in music!";
+        djMessage = response.choices[0]?.message?.content || djMessage;
+      } catch (aiError) {
+        console.error('AI service error:', aiError);
+        // Continue with default DJ message if AI service fails
+      }
+    }
 
     // Generate recommended songs based on user's preferences
     const recommendations = await generateRecommendations(topArtists, topGenres);
