@@ -61,7 +61,15 @@ export default function LikedSongsPage() {
       ...likedSong.track,
       youtubeId: likedSong.track.youtubeId || likedSong.track.id,
     };
-    playTrack(track);
+    
+    // Set liked songs context
+    const likedTracks = likedSongs.map(ls => ({
+      ...ls.track,
+      youtubeId: ls.track.youtubeId || ls.track.id,
+    }));
+    
+    setQueue(likedTracks, 'liked');
+    playTrack(track, 'liked');
   };
 
   const handlePlayAll = () => {
@@ -72,8 +80,8 @@ export default function LikedSongsPage() {
       youtubeId: likedSong.track.youtubeId || likedSong.track.id,
     }));
     
-    setQueue(tracks);
-    playTrack(tracks[0]);
+    setQueue(tracks, 'liked');
+    playTrack(tracks[0], 'liked');
   };
 
   const handleUnlike = async (trackId: string) => {

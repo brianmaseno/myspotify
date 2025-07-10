@@ -23,7 +23,22 @@ export async function GET(request: NextRequest) {
     );
 
     if (!searchResponse.ok) {
-      throw new Error(`YouTube API error: ${searchResponse.status}`);
+      const errorText = await searchResponse.text();
+      console.error('YouTube API Error:', {
+        status: searchResponse.status,
+        statusText: searchResponse.statusText,
+        body: errorText
+      });
+      
+      // Provide specific error messages
+      let errorMessage = `YouTube API error: ${searchResponse.status}`;
+      if (searchResponse.status === 403) {
+        errorMessage += ' - Likely quota exceeded or invalid API key';
+      } else if (searchResponse.status === 400) {
+        errorMessage += ' - Bad request, check parameters';
+      }
+      
+      throw new Error(errorMessage);
     }
 
     const searchData = await searchResponse.json();
@@ -133,8 +148,57 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error('YouTube API error:', error);
+    
+    // Fallback: Return mock data for development/testing
+    if (process.env.NODE_ENV === 'development') {
+      const mockResults = [
+        {
+          id: `mock-${Date.now()}-1`,
+          title: `${query} - Hit Song`,
+          artist: 'Popular Artist',
+          thumbnail: '/placeholder-music.svg',
+          duration: '3:45',
+          type: 'video',
+          source: 'youtube',
+          publishedAt: new Date().toISOString(),
+          description: `Mock result for ${query}`,
+          audioUrl: '#',
+          videoUrl: '#',
+          youtubeId: `mock-${Date.now()}-1`,
+          canPlayAsAudio: true,
+          views: '1.2M',
+          album: null
+        },
+        {
+          id: `mock-${Date.now()}-2`,
+          title: `${query} - Another Hit`,
+          artist: 'Famous Band',
+          thumbnail: '/placeholder-music.svg',
+          duration: '4:12',
+          type: 'video',
+          source: 'youtube',
+          publishedAt: new Date().toISOString(),
+          description: `Another mock result for ${query}`,
+          audioUrl: '#',
+          videoUrl: '#',
+          youtubeId: `mock-${Date.now()}-2`,
+          canPlayAsAudio: true,
+          views: '2.5M',
+          album: null
+        }
+      ];
+
+      return NextResponse.json({
+        results: mockResults,
+        totalResults: mockResults.length,
+        nextPageToken: null,
+        fallback: true,
+        message: 'Using mock data due to YouTube API error'
+      });
+    }
+    
     return NextResponse.json(
-      { error: 'Failed to search YouTube' },
+      { error: 'Failed to search YouTube', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }

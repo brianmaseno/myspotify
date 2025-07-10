@@ -30,7 +30,7 @@ export default function HistoryPage() {
   const [history, setHistory] = useState<HistoryTrack[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { playTrack } = useAudioPlayer();
+  const { playTrack, setQueue } = useAudioPlayer();
   const { data: session } = useSession();
 
   useEffect(() => {
@@ -63,7 +63,15 @@ export default function HistoryPage() {
       ...historyTrack.track,
       youtubeId: historyTrack.track.youtubeId || historyTrack.track.id,
     };
-    playTrack(track);
+    
+    // Set history context
+    const historyTracks = history.map(h => ({
+      ...h.track,
+      youtubeId: h.track.youtubeId || h.track.id,
+    }));
+    
+    setQueue(historyTracks, 'history');
+    playTrack(track, 'history');
   };
 
   const formatDate = (dateString: string) => {

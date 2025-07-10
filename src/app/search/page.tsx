@@ -32,7 +32,7 @@ export default function SearchPage() {
   const [selectedVideo, setSelectedVideo] = useState<SearchResult | null>(null);
 
   // Use global audio player
-  const { playTrack } = useAudioPlayer();
+  const { playTrack, setQueue } = useAudioPlayer();
 
   const searchTabs = [
     { id: "all", label: "All", icon: Search },
@@ -92,7 +92,21 @@ export default function SearchPage() {
       album: result.album
     };
     
-    playTrack(track);
+    // Set search context with current search results as queue
+    const searchTracks = filteredResults.map(r => ({
+      id: r.id,
+      youtubeId: r.id,
+      title: r.title,
+      artist: r.artist,
+      thumbnail: r.thumbnail,
+      duration: r.duration,
+      source: r.source || 'youtube',
+      audioUrl: r.audioUrl,
+      album: r.album
+    }));
+    
+    setQueue(searchTracks, 'search');
+    playTrack(track, 'search');
   };
 
   const handlePlayClick = (result: SearchResult) => {

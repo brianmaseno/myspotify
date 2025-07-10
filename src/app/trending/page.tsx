@@ -60,7 +60,7 @@ export default function TrendingPage() {
   const [selectedVideo, setSelectedVideo] = useState<TrendingVideo | null>(null);
 
   // Use global audio player
-  const { playTrack } = useAudioPlayer();
+  const { playTrack, setQueue } = useAudioPlayer();
 
   useEffect(() => {
     const fetchTrendingData = async () => {
@@ -142,7 +142,23 @@ export default function TrendingPage() {
       album: track.album?.name || 'Unknown Album'
     };
     
-    playTrack(audioTrack);
+    // Set trending context
+    const trendingTracksForQueue = trendingTracks.map(t => ({
+      id: t.youtubeId || t.id,
+      title: t.name || t.title || 'Unknown Title',
+      artist: t.artists?.[0]?.name || t.artist || 'Unknown Artist',
+      thumbnail: t.thumbnail || t.album?.images?.[0]?.url || '/placeholder-music.svg',
+      duration: t.duration || '3:00',
+      source: t.source,
+      audioUrl: t.audioUrl,
+      videoUrl: t.videoUrl,
+      youtubeId: t.youtubeId || t.id,
+      preview_url: t.preview_url,
+      album: t.album?.name || 'Unknown Album'
+    }));
+    
+    setQueue(trendingTracksForQueue, 'trending');
+    playTrack(audioTrack, 'trending');
   };
 
   const handleVideoPlay = (video: TrendingVideo) => {
