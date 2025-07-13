@@ -67,31 +67,32 @@ export async function POST() {
     const topGenres = analyzeTopGenres(playHistory, likedSongs);
     const recentTracks = playHistory.slice(0, 10).map(h => h.track);
 
-    // Default fallback message
-    let djMessage = "Hey there! I'm DJ X, and I've got some amazing tracks lined up for you based on your incredible taste in music!";
+    // Default fallback message - short and energetic
+    let djMessage = "Hey! DJ X here. I've got some fire tracks coming your way!";
     
     if (client) {
       try {
-        // Create personalized message
-        const prompt = `You are DJ X, a cool and friendly AI DJ. Based on the user's music taste, create a personalized greeting and music recommendation. 
+        // Create short, personalized message
+        const prompt = `You are DJ X, a cool AI DJ like Spotify's DJ. Create a very short (1-2 sentences max), energetic greeting. 
 
-User's top artists: ${topArtists.slice(0, 5).join(', ') || 'Various Artists'}
-User's top genres: ${topGenres.slice(0, 3).join(', ') || 'Mixed Genres'}
-Recent tracks: ${recentTracks.map(t => `${t.artist} - ${t.title}`).slice(0, 3).join(', ') || 'Various tracks'}
+User's music: ${topArtists.slice(0, 3).join(', ') || 'Various Artists'}
+Genres: ${topGenres.slice(0, 2).join(', ') || 'Mixed'}
 
-Create a warm, enthusiastic greeting (2-3 sentences) and suggest 5 songs similar to their taste. Keep it casual and exciting, like a real DJ introducing a set. End with enthusiasm about the music you're about to play.`;
+Keep it brief, exciting, and DJ-like. No long introductions - just quick energy like "What's up! Got some amazing [genre] vibes for you!" or "Hey there! Time for some [artist] energy!"`;
 
         const response = await client.chat.completions.create({
           model: process.env.AZURE_OPENAI_DEPLOYMENT!,
           messages: [
-            { role: 'system', content: 'You are DJ X, an enthusiastic AI DJ who loves music and knows how to get people excited about great songs.' },
+            { role: 'system', content: 'You are DJ X, a brief and energetic AI DJ. Keep messages under 15 words. Be like Spotify DJ - short, fun, energetic.' },
             { role: 'user', content: prompt }
           ],
-          max_tokens: 300,
-          temperature: 0.8,
+          max_tokens: 50,
+          temperature: 0.9,
         });
 
-        djMessage = response.choices[0]?.message?.content || djMessage;
+        const aiMessage = response.choices[0]?.message?.content || djMessage;
+        // Ensure the message is short
+        djMessage = aiMessage.length > 80 ? djMessage : aiMessage;
       } catch (aiError) {
         console.error('AI service error:', aiError);
         // Continue with default DJ message if AI service fails
@@ -176,15 +177,44 @@ function analyzeTopGenres(playHistory: PlayHistoryEntry[], likedSongs: LikedSong
 }
 
 async function generateRecommendations(topArtists: string[], topGenres: string[]) {
-  // This would ideally fetch from YouTube API based on user preferences
-  // For now, we'll return some sample recommendations
-  const searchQueries = [
-    `${topArtists[0]} similar artists`,
-    `${topGenres[0]} music 2024`,
-    `${topArtists[1]} best songs`,
-    `${topGenres[1]} playlist`,
-    `${topArtists[2]} latest music`
+  // Generate search queries for related songs
+  const searchQueries: string[] = [];
+  
+  // Add similar artists to top artists
+  if (topArtists.length > 0) {
+    searchQueries.push(`${topArtists[0]} similar artists best songs`);
+    if (topArtists.length > 1) {
+      searchQueries.push(`${topArtists[1]} popular tracks`);
+    }
+    if (topArtists.length > 2) {
+      searchQueries.push(`${topArtists[2]} hit songs`);
+    }
+  }
+  
+  // Add genre-based recommendations
+  if (topGenres.length > 0) {
+    searchQueries.push(`${topGenres[0]} trending songs 2024`);
+    if (topGenres.length > 1) {
+      searchQueries.push(`${topGenres[1]} popular hits`);
+    }
+  }
+  
+  // Add some variety with related recommendations
+  const relatedQueries = [
+    'trending music 2024',
+    'viral songs tiktok',
+    'popular hits now',
+    'new music 2024',
+    'best songs right now'
   ];
+  
+  // Fill remaining slots with related content
+  while (searchQueries.length < 8) {
+    const randomQuery = relatedQueries[Math.floor(Math.random() * relatedQueries.length)];
+    if (!searchQueries.includes(randomQuery)) {
+      searchQueries.push(randomQuery);
+    }
+  }
 
-  return searchQueries.slice(0, 5);
+  return searchQueries.slice(0, 8);
 }

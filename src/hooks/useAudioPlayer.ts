@@ -39,7 +39,7 @@ interface AudioPlayerState {
   setCurrentTrack: (track: Track) => void;
   setIsPlaying: (playing: boolean) => void;
   playTrack: (track: Track, context?: string) => void;
-  playNext: () => void;
+  playNext: () => Promise<void>;
   playPrevious: () => void;
   addToQueue: (track: Track) => void;
   setQueue: (tracks: Track[], context?: string) => void;
@@ -111,8 +111,8 @@ export const useAudioPlayer = create<AudioPlayerState>()(
         }
       },
 
-      playNext: () => {
-        const { queue, currentIndex, isShuffle, getSmartNextTrack, playbackContext, contextQueue, isRepeat, currentTrack } = get();
+      playNext: async () => {
+        const { queue, currentIndex, isShuffle, playbackContext, contextQueue, isRepeat, currentTrack } = get();
         
         // Handle repeat single track
         if (isRepeat && currentTrack) {
@@ -128,14 +128,16 @@ export const useAudioPlayer = create<AudioPlayerState>()(
         
         if (activeQueue.length === 0) return;
         
-        // Try smart next track first (same artist/genre) based on context
-        if (playbackContext === 'history' || playbackContext === 'liked') {
-          // For history/liked, just use the queue order
+        // Check if we have more tracks in the queue
+        const hasNextInQueue = currentIndex < activeQueue.length - 1;
+        
+        if (hasNextInQueue) {
+          // Play next track in queue
           let nextIndex;
           if (isShuffle) {
             nextIndex = Math.floor(Math.random() * activeQueue.length);
           } else {
-            nextIndex = (currentIndex + 1) % activeQueue.length;
+            nextIndex = currentIndex + 1;
           }
           
           const nextTrack = activeQueue[nextIndex];
@@ -148,31 +150,107 @@ export const useAudioPlayer = create<AudioPlayerState>()(
             });
             get().addToRecentlyPlayed(nextTrack);
           }
-        } else {
-          // For search/trending, try smart recommendations
-          const smartNext = getSmartNextTrack();
-          if (smartNext && activeQueue.find(t => t.id === smartNext.id)) {
-            const smartIndex = activeQueue.findIndex(t => t.id === smartNext.id);
+        } else if (currentTrack && (playbackContext === 'search' || playbackContext === 'trending' || playbackContext === 'general')) {
+          // Auto-find related songs when queue is exhausted (except for history/liked contexts)
+          try {
+            // Search for related songs by the same artist
+            const artistQuery = `${currentTrack.artist} popular songs`;
+            const response = await fetch(`/api/search/youtube?q=${encodeURIComponent(artistQuery)}&maxResults=5`);
+            
+            if (response.ok) {
+              const data = await response.json();
+              if (data.results && data.results.length > 0) {
+                // Filter out the current track and add to queue
+                const relatedTracks = data.results
+                  .filter((track: any) => track.id !== currentTrack.id)
+                  .map((track: any) => ({
+                    id: track.id,
+                    title: track.title,
+                    artist: track.artist,
+                    thumbnail: track.thumbnail,
+                    duration: track.duration,
+                    source: 'youtube' as const,
+                    audioUrl: track.audioUrl,
+                    videoUrl: track.videoUrl,
+                    youtubeId: track.youtubeId,
+                  }));
+                
+                if (relatedTracks.length > 0) {
+                  // Add related tracks to queue and play the first one
+                  const updatedQueue = [...activeQueue, ...relatedTracks];
+                  const nextTrack = relatedTracks[0];
+                  
+                  set({ 
+                    queue: updatedQueue,
+                    currentTrack: nextTrack,
+                    currentIndex: updatedQueue.length - relatedTracks.length,
+                    isPlaying: true
+                  });
+                  
+                  get().addToRecentlyPlayed(nextTrack);
+                  return;
+                }
+              }
+            }
+            
+            // If artist search fails, try genre-based search
+            const genreQuery = `${currentTrack.artist} similar artists songs`;
+            const genreResponse = await fetch(`/api/search/youtube?q=${encodeURIComponent(genreQuery)}&maxResults=3`);
+            
+            if (genreResponse.ok) {
+              const genreData = await genreResponse.json();
+              if (genreData.results && genreData.results.length > 0) {
+                const similarTracks = genreData.results
+                  .filter((track: any) => track.id !== currentTrack.id)
+                  .map((track: any) => ({
+                    id: track.id,
+                    title: track.title,
+                    artist: track.artist,
+                    thumbnail: track.thumbnail,
+                    duration: track.duration,
+                    source: 'youtube' as const,
+                    audioUrl: track.audioUrl,
+                    videoUrl: track.videoUrl,
+                    youtubeId: track.youtubeId,
+                  }));
+                
+                if (similarTracks.length > 0) {
+                  const updatedQueue = [...activeQueue, ...similarTracks];
+                  const nextTrack = similarTracks[0];
+                  
+                  set({ 
+                    queue: updatedQueue,
+                    currentTrack: nextTrack,
+                    currentIndex: updatedQueue.length - similarTracks.length,
+                    isPlaying: true
+                  });
+                  
+                  get().addToRecentlyPlayed(nextTrack);
+                  return;
+                }
+              }
+            }
+          } catch (error) {
+            console.error('Error finding related tracks:', error);
+          }
+          
+          // If auto-search fails, loop back to start of queue
+          if (activeQueue.length > 0) {
+            const firstTrack = activeQueue[0];
             set({
-              currentTrack: smartNext,
-              currentIndex: smartIndex,
+              currentTrack: firstTrack,
+              currentIndex: 0,
               isPlaying: true,
               queue: activeQueue
             });
-            get().addToRecentlyPlayed(smartNext);
-            return;
+            get().addToRecentlyPlayed(firstTrack);
           }
-          
-          // Fallback to normal next
-          let nextIndex;
-          if (isShuffle) {
-            nextIndex = Math.floor(Math.random() * activeQueue.length);
-          } else {
-            nextIndex = (currentIndex + 1) % activeQueue.length;
-          }
-          
-          const nextTrack = activeQueue[nextIndex];
-          if (nextTrack) {
+        } else {
+          // For history/liked contexts, just loop back to start
+          if (activeQueue.length > 0) {
+            const nextIndex = isShuffle ? Math.floor(Math.random() * activeQueue.length) : 0;
+            const nextTrack = activeQueue[nextIndex];
+            
             set({
               currentTrack: nextTrack,
               currentIndex: nextIndex,
@@ -324,12 +402,18 @@ export const useAudioPlayer = create<AudioPlayerState>()(
     {
       name: 'audio-player-storage',
       partialize: (state) => ({
+        currentTrack: state.currentTrack, // Persist current track
+        currentIndex: state.currentIndex, // Persist current index
+        queue: state.queue, // Persist queue
+        contextQueue: state.contextQueue, // Persist context queue
+        playbackContext: state.playbackContext, // Persist playback context
         volume: state.volume,
         isMuted: state.isMuted,
         isRepeat: state.isRepeat,
         isShuffle: state.isShuffle,
         recentlyPlayed: state.recentlyPlayed,
         likedSongs: state.likedSongs,
+        isPlaying: false, // Don't auto-resume playback on page load
       }),
     }
   )

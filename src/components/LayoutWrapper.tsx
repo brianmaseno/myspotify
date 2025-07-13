@@ -160,7 +160,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
                 </motion.button>
 
                 {/* User Menu */}
-                <div className="relative user-menu-container z-[9999]">
+                <div className="relative user-menu-container z-[99999]">
                   <motion.button
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.95 }}
@@ -188,7 +188,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: -10, scale: 0.95 }}
                         transition={{ duration: 0.2 }}
-                        className="absolute top-12 right-0 w-48 bg-black/95 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl overflow-hidden z-[9999]"
+                        className="absolute top-12 right-0 w-48 bg-black/95 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl overflow-hidden z-[99999]"
                       >
                         {session ? (
                           <>

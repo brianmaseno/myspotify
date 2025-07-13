@@ -78,11 +78,6 @@ export default function AudioPlayer() {
     }
   };
 
-  const handleYouTubeReady = () => {
-    setPlayerReady(true);
-    setPlayerError(false);
-  };
-
   const handleYouTubeStateChange = (state: number) => {
     // YouTube player states:
     // -1 (unstarted)
@@ -95,18 +90,23 @@ export default function AudioPlayer() {
     switch (state) {
       case 0: // ended
         setCurrentTime(0);
-        setIsPlaying(false);
         if (isRepeat) {
-          // Repeat current track
+          // Repeat current track - restart immediately
+          setIsPlaying(true);
           setTimeout(() => {
-            setIsPlaying(true);
-            // Restart the track
             if ((window as any).youtubePlayerSeekTo) {
               (window as any).youtubePlayerSeekTo(0);
             }
-          }, 500);
+            if ((window as any).youtubePlayerPlay) {
+              (window as any).youtubePlayerPlay();
+            }
+          }, 100);
         } else {
-          setTimeout(() => playNext(), 500);
+          setIsPlaying(false);
+          // Use async playNext for auto-finding related songs
+          setTimeout(async () => {
+            await playNext();
+          }, 500);
         }
         break;
       case 1: // playing
@@ -145,7 +145,7 @@ export default function AudioPlayer() {
     <motion.div
       initial={{ y: 100, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      className="fixed bottom-0 left-0 right-0 bg-black/90 backdrop-blur-xl border-t border-gray-800 p-4 z-50"
+      className="fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur-xl border-t border-gray-800 p-4 z-[100]"
     >
       <YouTubeAudioPlayer
         videoId={currentTrack.youtubeId || currentTrack.id}
@@ -247,7 +247,7 @@ export default function AudioPlayer() {
             {/* Right Controls */}
             <div className="flex items-center space-x-2">
               <button
-                onClick={playNext}
+                onClick={async () => await playNext()}
                 className="p-2 rounded-full hover:bg-white/20 transition-colors"
               >
                 <SkipForward className="w-5 h-5 text-white" />
@@ -340,7 +340,7 @@ export default function AudioPlayer() {
               </button>
               
               <button
-                onClick={playNext}
+                onClick={async () => await playNext()}
                 className="p-2 rounded-full hover:bg-white/20 transition-colors"
               >
                 <SkipForward className="w-5 h-5 text-white" />

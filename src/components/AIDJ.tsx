@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bot, Play, Volume2, Sparkles, X, VolumeX } from 'lucide-react';
+import { Bot, Play, Volume2, X, VolumeX } from 'lucide-react';
 import { useAudioPlayer } from '@/hooks/useAudioPlayer';
 import { useSession } from 'next-auth/react';
 
@@ -287,35 +287,44 @@ export default function AIDJ({ isOpen, onClose }: AIDJProps) {
               <motion.div
                 animate={{ 
                   rotate: (isPlaying || isSpeaking) ? 360 : 0,
-                  scale: (isPlaying || isSpeaking) ? [1, 1.1, 1] : 1,
+                  scale: (isPlaying || isSpeaking) ? [1, 1.05, 1] : 1,
                 }}
                 transition={{ 
-                  rotate: { duration: 3, repeat: (isPlaying || isSpeaking) ? Infinity : 0, ease: "linear" },
-                  scale: { duration: 2, repeat: (isPlaying || isSpeaking) ? Infinity : 0 }
+                  rotate: { duration: 4, repeat: (isPlaying || isSpeaking) ? Infinity : 0, ease: "linear" },
+                  scale: { duration: 1.5, repeat: (isPlaying || isSpeaking) ? Infinity : 0 }
                 }}
-                className={`w-24 h-24 mx-auto mb-6 rounded-full flex items-center justify-center relative ${
-                  (isPlaying || isSpeaking) ? 'bg-gradient-to-r from-blue-500 to-purple-500' : 'bg-gradient-to-r from-gray-600 to-gray-700'
+                className={`w-20 h-20 mx-auto mb-4 rounded-full flex items-center justify-center relative ${
+                  (isPlaying || isSpeaking) ? 'bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 shadow-lg shadow-blue-500/50' : 'bg-gradient-to-r from-gray-600 to-gray-700'
                 }`}
               >
-                <Bot className="w-12 h-12 text-white" />
-                {(isPlaying || isSpeaking) && (
-                  <div className="absolute inset-0 rounded-full border-4 border-white/30 animate-ping"></div>
-                )}
-                <Sparkles className="absolute -top-2 -right-2 w-6 h-6 text-yellow-400 animate-pulse" />
+                {/* Spotify-like circular design */}
+                <div className={`w-16 h-16 rounded-full flex items-center justify-center ${
+                  (isPlaying || isSpeaking) ? 'bg-blue-600' : 'bg-gray-600'
+                }`}>
+                  <Bot className="w-8 h-8 text-white" />
+                </div>
                 
-                {/* Speaking indicator */}
+                {/* Pulsing ring effect when active */}
+                {(isPlaying || isSpeaking) && (
+                  <>
+                    <div className="absolute inset-0 rounded-full border-2 border-blue-400/60 animate-ping"></div>
+                    <div className="absolute inset-0 rounded-full border border-blue-300/40 animate-pulse"></div>
+                  </>
+                )}
+                
+                {/* Speaking indicator dots */}
                 {isSpeaking && (
-                  <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2">
-                    <div className="flex space-x-1">
+                  <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2">
+                    <div className="flex space-x-0.5">
                       {[...Array(3)].map((_, i) => (
                         <motion.div
                           key={i}
-                          className="w-1 h-1 bg-white rounded-full"
-                          animate={{ scale: [1, 1.5, 1] }}
+                          className="w-1 h-1 bg-blue-400 rounded-full"
+                          animate={{ scale: [0.8, 1.2, 0.8], opacity: [0.5, 1, 0.5] }}
                           transition={{ 
-                            duration: 0.6, 
+                            duration: 0.8, 
                             repeat: Infinity, 
-                            delay: i * 0.2 
+                            delay: i * 0.15 
                           }}
                         />
                       ))}
@@ -325,8 +334,8 @@ export default function AIDJ({ isOpen, onClose }: AIDJProps) {
               </motion.div>
 
               {/* DJ Name */}
-              <h2 className="text-3xl font-bold text-white mb-2">DJ X</h2>
-              <p className="text-blue-300 mb-6">Your AI Music Companion</p>
+              <h2 className="text-2xl font-bold text-white mb-1">DJ X</h2>
+              <p className="text-blue-300 mb-4 text-sm">Your AI Music Companion</p>
 
               {/* Status Indicator */}
               {(isSpeaking || isTyping) && (
@@ -343,9 +352,9 @@ export default function AIDJ({ isOpen, onClose }: AIDJProps) {
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="bg-white/10 backdrop-blur rounded-2xl p-4 mb-6 border border-white/20 min-h-[80px] flex items-center"
+                  className="bg-white/10 backdrop-blur rounded-xl p-3 mb-4 border border-white/20 min-h-[60px] flex items-center"
                 >
-                  <p className="text-white text-sm leading-relaxed">
+                  <p className="text-white text-xs leading-relaxed">
                     {speechEnabled ? djMessage : (typingText || djMessage)}
                     {isTyping && <span className="animate-pulse">|</span>}
                   </p>
@@ -358,15 +367,15 @@ export default function AIDJ({ isOpen, onClose }: AIDJProps) {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.3 }}
-                  className="grid grid-cols-2 gap-4 mb-6"
+                  className="grid grid-cols-2 gap-3 mb-4"
                 >
-                  <div className="bg-white/10 rounded-xl p-3">
-                    <div className="text-2xl font-bold text-purple-300">{userStats.totalPlayed}</div>
-                    <div className="text-xs text-gray-300">Songs Played</div>
+                  <div className="bg-white/10 rounded-lg p-2">
+                    <div className="text-lg font-bold text-blue-300">{userStats.totalPlayed}</div>
+                    <div className="text-xs text-gray-300">Played</div>
                   </div>
-                  <div className="bg-white/10 rounded-xl p-3">
-                    <div className="text-2xl font-bold text-pink-300">{userStats.totalLiked}</div>
-                    <div className="text-xs text-gray-300">Liked Songs</div>
+                  <div className="bg-white/10 rounded-lg p-2">
+                    <div className="text-lg font-bold text-blue-300">{userStats.totalLiked}</div>
+                    <div className="text-xs text-gray-300">Liked</div>
                   </div>
                 </motion.div>
               )}
