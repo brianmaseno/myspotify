@@ -65,7 +65,6 @@ export async function POST() {
     // Analyze user preferences
     const topArtists = analyzeTopArtists(playHistory, likedSongs);
     const topGenres = analyzeTopGenres(playHistory, likedSongs);
-    const recentTracks = playHistory.slice(0, 10).map(h => h.track);
 
     // Default fallback message - short and energetic
     let djMessage = "Hey! DJ X here. I've got some fire tracks coming your way!";
